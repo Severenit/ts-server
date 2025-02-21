@@ -8,8 +8,12 @@ if (!process.env.TELEGRAM_BOT_TOKEN) {
   process.exit(1);
 }
 
-// Инициализация Telegram бота
-const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { polling: true });
+const TELEGRAM_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+const url = process.env.VERCEL_URL || 'http://localhost:3000';
+const webhookPath = `/webhook/${TELEGRAM_TOKEN}`;
+
+// Инициализация Telegram бота с webhook
+const bot = new TelegramBot(TELEGRAM_TOKEN, { webHook: { port: 443 } });
 
 // Создание Hapi сервера
 const server = Hapi.server({
@@ -29,7 +33,7 @@ server.route({
   }
 });
 
-// Маршрут для проверки здоровья сервера (требуется для Vercel)
+// Маршрут для проверки здоровья сервера
 server.route({
   method: 'GET',
   path: '/health',
@@ -38,18 +42,44 @@ server.route({
   }
 });
 
-// Обработчик сообщений Telegram
-bot.on('message', async (msg) => {
-  const chatId = msg.chat.id;
-  console.log('Received message:', msg.text);
-  await bot.sendMessage(chatId, `Echo: ${msg.text}`);
+// Маршрут для webhook
+server.route({
+  method: 'POST',
+  path: webhookPath,
+  handler: async (request, h) => {
+    const update = request.payload as any;
+    
+    if (update?.message) {
+      const chatId = update.message.chat.id;
+      const text = update.message.text;
+      
+      console.log('Received message:', text);
+      await bot.sendMessage(chatId, `Echo: ${text}`);
+    }
+    
+    return { status: 'ok' };
+  }
 });
+
+// Функция установки webhook URL
+const setWebhook = async () => {
+  try {
+    const webhookUrl = `${url}${webhookPath}`;
+    console.log('Setting webhook URL:', webhookUrl);
+    await bot.setWebHook(webhookUrl);
+    console.log('Webhook set successfully');
+  } catch (error) {
+    console.error('Error setting webhook:', error);
+    process.exit(1);
+  }
+};
 
 // Запуск сервера
 const init = async () => {
   try {
     await server.start();
     console.log('Server running on %s', server.info.uri);
+    await setWebhook();
   } catch (err) {
     console.error('Error starting server:', err);
     process.exit(1);
