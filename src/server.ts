@@ -9,6 +9,7 @@ if (!process.env.TELEGRAM_BOT_TOKEN) {
 }
 
 const TELEGRAM_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+const url = process.env.VERCEL_URL || 'https://vite-server-rho.vercel.app';
 const webhookPath = `/webhook/${TELEGRAM_TOKEN}`;
 
 // Инициализация Telegram бота с webhook
@@ -63,7 +64,7 @@ server.route({
 // Функция установки webhook URL
 const setWebhook = async () => {
   try {
-    const webhookUrl = `https://vite-server-rho.vercel.app${webhookPath}`;
+    const webhookUrl = `${url}${webhookPath}`;
     console.log('Setting webhook URL:', webhookUrl);
     await bot.setWebHook(webhookUrl);
     console.log('Webhook set successfully');
