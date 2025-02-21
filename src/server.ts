@@ -29,7 +29,16 @@ server.route({
   method: 'GET',
   path: '/',
   handler: (request, h) => {
-    return { message: 'Hello from Hapi server!' };
+    return {
+      status: 'ok',
+      message: 'Telegram Bot Server is running',
+      version: '1.0.0',
+      endpoints: {
+        health: '/health',
+        webhook: webhookPath
+      },
+      serverTime: new Date().toISOString()
+    };
   }
 });
 
@@ -38,7 +47,10 @@ server.route({
   method: 'GET',
   path: '/health',
   handler: (request, h) => {
-    return { status: 'ok' };
+    return { 
+      status: 'ok',
+      timestamp: new Date().toISOString()
+    };
   }
 });
 

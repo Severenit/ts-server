@@ -8,9 +8,16 @@
   ],
   "routes": [
     {
+      "src": "/webhook/.*",
+      "dest": "src/server.ts"
+    },
+    {
+      "src": "/health",
+      "dest": "src/server.ts"
+    },
+    {
       "src": "/(.*)",
-      "dest": "src/server.ts",
-      "methods": ["GET", "POST", "OPTIONS"]
+      "dest": "src/server.ts"
     }
   ]
 } 
