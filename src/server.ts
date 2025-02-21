@@ -13,8 +13,11 @@ const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { polling: true });
 
 // Создание Hapi сервера
 const server = Hapi.server({
-  port: 3000,
-  host: 'localhost'
+  port: process.env.PORT || 3000,
+  host: '0.0.0.0',
+  routes: {
+    cors: true
+  }
 });
 
 // Базовый маршрут
@@ -23,6 +26,15 @@ server.route({
   path: '/',
   handler: (request, h) => {
     return { message: 'Hello from Hapi server!' };
+  }
+});
+
+// Маршрут для проверки здоровья сервера (требуется для Vercel)
+server.route({
+  method: 'GET',
+  path: '/health',
+  handler: (request, h) => {
+    return { status: 'ok' };
   }
 });
 

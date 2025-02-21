@@ -5,8 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "node --loader ts-node/esm src/server.ts",
-    "build": "tsc && cp .env dist/",
-    "start": "node dist/server.js"
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "vercel-build": "tsc"
   },
   "devDependencies": {
     "@types/hapi": "^18.0.0",
@@ -19,5 +20,8 @@
     "@hapi/hapi": "^21.3.0",
     "dotenv": "^16.4.0",
     "node-telegram-bot-api": "^0.66.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }
