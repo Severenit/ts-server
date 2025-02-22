@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "ts-node --esm src/server.ts",
+    "dev": "NODE_OPTIONS=\"--loader ts-node/esm\" ts-node src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
     "vercel-dev": "vercel dev",
@@ -24,6 +24,6 @@
     "node-telegram-bot-api": "^0.66.0"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": "20.x"
   }
 }
