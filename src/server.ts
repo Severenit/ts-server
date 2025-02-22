@@ -1,6 +1,5 @@
 import Hapi from '@hapi/hapi';
 import bot from "./bot.js";
-import { Update } from 'node-telegram-bot-api';
 
 const init = async () => {
   const server = Hapi.server({
@@ -30,22 +29,6 @@ const init = async () => {
         status: 'ok',
         timestamp: new Date().toISOString()
       };
-    }
-  });
-
-  // Маршрут для вебхука бота
-  server.route({
-    method: 'POST',
-    path: '/api/webhook',
-    handler: async (request, h) => {
-      try {
-        console.log('Webhook received:', request.payload);
-        await bot.processUpdate(request.payload as Update);
-        return h.response({ ok: true }).code(200);
-      } catch (error) {
-        console.error('Error processing webhook:', error);
-        return h.response({ error: 'Internal server error' }).code(500);
-      }
     }
   });
 

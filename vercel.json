@@ -4,6 +4,8 @@
     { "src": "src/**/*.ts", "use": "@vercel/node" }
   ],
   "routes": [
-    { "src": "/(.*)", "dest": "/src/server.ts" }
+    { "src": "/webhook", "dest": "/src/api/webhook.ts" },
+    { "src": "/api/(.*)", "dest": "/src/server.ts" },
+    { "src": "/", "dest": "/src/server.ts" }
   ]
 } 
