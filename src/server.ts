@@ -1,6 +1,6 @@
 import 'dotenv/config';
+import Hapi from '@hapi/hapi';
 import TelegramBot from 'node-telegram-bot-api';
-import { VercelRequest, VercelResponse } from '@vercel/node';
 
 // Проверка наличия токена
 if (!process.env.TELEGRAM_BOT_TOKEN) {
@@ -8,50 +8,45 @@ if (!process.env.TELEGRAM_BOT_TOKEN) {
   process.exit(1);
 }
 
-const TELEGRAM_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+// Инициализация Telegram бота в режиме long polling
+const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { polling: true });
 
-// Инициализация Telegram бота
-const bot = new TelegramBot(TELEGRAM_TOKEN);
+// Обработчик сообщений
+bot.on('message', async (msg) => {
+  const chatId = msg.chat.id;
+  const text = msg.text;
+  
+  console.log('Received message:', text);
+  await bot.sendMessage(chatId, `Echo: ${text}`);
+});
 
-// Обработчик для корневого маршрута
-export default async function handler(
-  request: VercelRequest,
-  response: VercelResponse
-) {
-  if (request.method === 'GET') {
-    return response.json({ 
+// Создание Hapi сервера
+const server = Hapi.server({
+  port: process.env.PORT || 3000,
+  host: '0.0.0.0'
+});
+
+// Базовый маршрут
+server.route({
+  method: 'GET',
+  path: '/',
+  handler: (request, h) => {
+    return { 
       status: 'ok',
-      message: 'Server is running',
-      version: '1.0.0'
-    });
+      message: 'Server is running'
+    };
   }
+});
 
-  const url = request.url || '';
-  if (request.method === 'POST' && url.includes('/webhook/')) {
-    try {
-      const update = request.body;
-      
-      if (update?.message) {
-        const chatId = update.message.chat.id;
-        const text = update.message.text;
-        
-        console.log('Received message:', text);
-        await bot.sendMessage(chatId, `Echo: ${text}`);
-      }
-      
-      return response.json({ status: 'ok' });
-    } catch (error: unknown) {
-      console.error('Error processing webhook:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      return response.status(500).json({ 
-        status: 'error',
-        message: errorMessage 
-      });
-    }
+// Запуск сервера
+const init = async () => {
+  try {
+    await server.start();
+    console.log('Server running on %s', server.info.uri);
+  } catch (err) {
+    console.error('Error starting server:', err);
+    process.exit(1);
   }
+};
 
-  return response.status(404).json({ 
-    status: 'error',
-    message: 'Not found' 
-  });
-} 
+init(); 
