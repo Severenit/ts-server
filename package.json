@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "NODE_OPTIONS=\"--loader ts-node/esm\" ts-node src/server.ts",
+    "dev": "nodemon --watch 'src/**/*.ts' --exec 'NODE_OPTIONS=\"--loader ts-node/esm\" ts-node' src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
     "vercel-dev": "vercel dev",
@@ -15,6 +15,7 @@
     "@types/node": "^20.0.0",
     "@types/node-telegram-bot-api": "^0.64.0",
     "@vercel/node": "^3.0.0",
+    "nodemon": "^3.1.9",
     "ts-node": "^10.9.2",
     "typescript": "^5.0.0"
   },
