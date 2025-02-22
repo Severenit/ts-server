@@ -4,7 +4,7 @@ import { createServer } from "../serverInit.js";
 // Обработчик Vercel API
 export default async (req: VercelRequest, res: VercelResponse) => {
   const hapiServer = await createServer();
-  console.log(`🚀 Сервер запущен: ${hapiServer.info.uri}`);
+
   const hapiResponse = await hapiServer.inject({
     method: req.method as any,
     url: req.url!,
