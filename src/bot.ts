@@ -27,6 +27,12 @@ bot.onText(/\/start/, async (msg) => {
   const chatId = msg.chat.id;
   await bot.sendMessage(chatId, 'Добро пожаловать в Triple Triad! Начнем игру!', {
     reply_markup: {
+      keyboard: [
+        [
+          { text: 'Открыть игру', web_app: { url: WEBAPP_URL } },
+        ]
+      ],
+      resize_keyboard: true,
       inline_keyboard: [
         [
           { text: 'Открыть игру', web_app: { url: WEBAPP_URL } },
