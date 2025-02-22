@@ -21,13 +21,31 @@ const init = async () => {
     }
   });
 
-  // Маршрут для вебхука
+  // API маршруты
+  server.route({
+    method: 'GET',
+    path: '/api/health',
+    handler: (request, h) => {
+      return {
+        status: 'ok',
+        timestamp: new Date().toISOString()
+      };
+    }
+  });
+
+  // Маршрут для вебхука бота
   server.route({
     method: 'POST',
     path: '/api/webhook',
     handler: async (request, h) => {
-      await bot.processUpdate(request.payload as Update);
-      return h.response().code(200);
+      try {
+        console.log('Webhook received:', request.payload);
+        await bot.processUpdate(request.payload as Update);
+        return h.response({ ok: true }).code(200);
+      } catch (error) {
+        console.error('Error processing webhook:', error);
+        return h.response({ error: 'Internal server error' }).code(500);
+      }
     }
   });
 

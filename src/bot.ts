@@ -8,10 +8,10 @@ if (!token) {
   throw new Error("TELEGRAM_BOT_TOKEN не найден в .env!");
 }
 
-// В serverless окружении всегда используем webhook режим
+// Настраиваем бота для работы с вебхуком
 const bot = new TelegramBot(token, {
   webHook: {
-    port: process.env.PORT ? parseInt(process.env.PORT) : 443
+    port: process.env.PORT ? parseInt(process.env.PORT) : 3000
   }
 });
 
