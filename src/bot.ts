@@ -3,15 +3,16 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN as string;
-if (!BOT_TOKEN) {
+if (!process.env.TELEGRAM_BOT_TOKEN) {
   throw new Error("TELEGRAM_BOT_TOKEN не найден в .env!");
 }
 
-const bot = new TelegramBot(BOT_TOKEN, {
-  polling: process.env.USE_WEBHOOK !== "true"
+// В serverless окружении всегда используем webhook режим
+const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, {
+  webHook: true
 });
 
+// Обработчики сообщений
 bot.onText(/\/start/, async (msg) => {
   const chatId = msg.chat.id;
   await bot.sendMessage(chatId, 'Привет! Я эхо-бот. Отправь мне сообщение, и я отвечу тем же.');
