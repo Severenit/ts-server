@@ -4,13 +4,11 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "node --loader ts-node/esm src/server.ts",
+    "dev": "ts-node --esm src/server.ts",
     "build": "tsc",
-    "start": "node dist/server.js",
-    "vercel-build": "tsc"
+    "start": "node dist/server.js"
   },
   "devDependencies": {
-    "@types/axios": "^0.9.36",
     "@types/hapi": "^18.0.0",
     "@types/node": "^20.0.0",
     "@types/node-telegram-bot-api": "^0.64.0",

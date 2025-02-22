@@ -11,7 +11,7 @@ interface WebhookResponse {
 }
 
 // URL для вебхука, использует переменную окружения VERCEL_URL
-const WEBHOOK_URL = `${process.env.VERCEL_URL}/api/webhook`;
+export const WEBHOOK_URL = `${process.env.VERCEL_URL}/api/webhook`;
 
 // Функция для проверки и установки вебхука
 async function ensureWebhook() {
@@ -40,7 +40,6 @@ ensureWebhook();
 // Обработчик API endpoint для ручной установки вебхука
 export default async (req: VercelRequest, res: VercelResponse) => {
   const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-  const WEBHOOK_URL = `${process.env.VERCEL_URL}/api/webhook`;
 
   try {
     const response = await axios.get(
