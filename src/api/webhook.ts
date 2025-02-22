@@ -1,7 +1,5 @@
 import { VercelRequest, VercelResponse } from "@vercel/node";
-import TelegramBot from "node-telegram-bot-api";
-
-const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN as string);
+import bot from "../bot"; 
 
 export default async (req: VercelRequest, res: VercelResponse) => {
   if (req.method === "POST") {
