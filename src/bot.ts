@@ -6,6 +6,8 @@ dotenv.config();
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN as string;
 if (!BOT_TOKEN) {
   throw new Error("TELEGRAM_BOT_TOKEN не найден в .env!");
+} else {
+    console.log("BOT_TOKEN найден в .env и равен он %s!", BOT_TOKEN);
 }
 
 const bot = new TelegramBot(BOT_TOKEN);

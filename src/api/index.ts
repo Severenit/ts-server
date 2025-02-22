@@ -12,7 +12,7 @@ interface WebhookInfo {
 }
 
 let server: Hapi.Server | null = null;
-const WEBHOOK_URL = `${process.env.VERCEL_URL}/api/webhook`;
+const WEBHOOK_URL = `${process.env.VERCEL_URL}/webhook`;
 
 async function ensureWebhook() {
   try {
