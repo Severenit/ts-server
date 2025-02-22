@@ -3,9 +3,8 @@ import bot from "./bot.js";
 import { Update } from 'node-telegram-bot-api';
 
 const init = async () => {
-  // В development используем порт 3000, в production - порт от Vercel
   const server = Hapi.server({
-    port: process.env.NODE_ENV === 'production' ? process.env.PORT : 3000,
+    port: process.env.PORT || 3000,
     host: '0.0.0.0'
   });
 
@@ -18,7 +17,7 @@ const init = async () => {
         status: 'ok',
         message: 'Hello My Vercel Server',
         version: '1.0.0',
-        environment: process.env.NODE_ENV || 'development'
+        environment: process.env.NODE_ENV
       };
     }
   });
@@ -30,8 +29,7 @@ const init = async () => {
     handler: (request, h) => {
       return {
         status: 'ok',
-        timestamp: new Date().toISOString(),
-        environment: process.env.NODE_ENV || 'development'
+        timestamp: new Date().toISOString()
       };
     }
   });
@@ -53,7 +51,7 @@ const init = async () => {
   });
 
   await server.start();
-  console.log('Server running on %s in %s mode', server.info.uri, process.env.NODE_ENV || 'development');
+  console.log('Server running on %s', server.info.uri);
 };
 
 process.on('unhandledRejection', (err) => {
