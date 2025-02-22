@@ -3,35 +3,19 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-const token = process.env.TELEGRAM_BOT_TOKEN;
-if (!token) {
+const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN as string;
+if (!BOT_TOKEN) {
   throw new Error("TELEGRAM_BOT_TOKEN не найден в .env!");
 }
 
-// Создаем бота без дополнительных настроек, так как веб-хук обрабатывается отдельно
-const bot = new TelegramBot(token);
+const bot = new TelegramBot(BOT_TOKEN);
 
-// Обработчики сообщений
-bot.onText(/\/start/, async (msg) => {
-  try {
-    const chatId = msg.chat.id;
-    console.log('Received /start command from chat:', chatId);
-    await bot.sendMessage(chatId, 'Привет! Я эхо-бот. Отправь мне сообщение, и я отвечу тем же.');
-  } catch (error) {
-    console.error('Error handling /start command:', error);
-  }
-});
+bot.on("message", async (msg) => {
+  const chatId = msg.chat.id;
+  const text = msg.text;
 
-bot.on('message', async (msg) => {
-  try {
-    if (msg.text && !msg.text.startsWith('/')) {
-      const chatId = msg.chat.id;
-      console.log('Received message:', msg.text, 'from chat:', chatId);
-      await bot.sendMessage(chatId, `Эхо: ${msg.text}`);
-    }
-  } catch (error) {
-    console.error('Error handling message:', error);
-  }
+  console.log(`Сообщение от ${chatId}: ${text}`);
+  await bot.sendMessage(chatId, `Вы написали: ${text}`);
 });
 
 export default bot;
