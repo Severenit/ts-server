@@ -2,9 +2,10 @@ import Hapi from '@hapi/hapi';
 import bot from "./bot.js";
 
 const init = async () => {
+  // В production используем порт от Vercel, в development - 3000
   const server = Hapi.server({
-    port: process.env.PORT || 3000,
-    host: '0.0.0.0'
+    port: process.env.NODE_ENV === 'production' ? process.env.PORT : 3000,
+    host: process.env.NODE_ENV === 'production' ? '127.0.0.1' : '0.0.0.0'
   });
 
   // Базовый маршрут
@@ -33,7 +34,7 @@ const init = async () => {
   });
 
   await server.start();
-  console.log('Server running on %s', server.info.uri);
+  console.log('Server running on %s in %s mode', server.info.uri, process.env.NODE_ENV || 'development');
 };
 
 process.on('unhandledRejection', (err) => {
