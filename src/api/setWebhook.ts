@@ -1,6 +1,6 @@
 import { VercelRequest, VercelResponse } from "@vercel/node";
 import axios from "axios";
-import bot from "../bot"; 
+import bot from "../bot.js"; 
 
 // Определение типа ответа от Telegram API
 interface WebhookResponse {

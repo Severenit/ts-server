@@ -2,8 +2,8 @@
 import Hapi from "@hapi/hapi";
 import { Update } from "node-telegram-bot-api";
 import dotenv from "dotenv";
-import bot from "./bot"; 
-import { WEBHOOK_URL } from "./api/setWebhook";
+import bot from "./bot.js"; 
+import { WEBHOOK_URL } from "./api/setWebhook.js";
 
 // Загрузка переменных окружения
 dotenv.config();
