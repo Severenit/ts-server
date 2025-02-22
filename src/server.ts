@@ -16,8 +16,7 @@ const init = async () => {
       return {
         status: 'ok',
         message: 'Hello My Vercel Server',
-        version: '1.0.0',
-        environment: process.env.NODE_ENV
+        version: '1.0.0'
       };
     }
   });

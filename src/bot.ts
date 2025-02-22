@@ -8,10 +8,8 @@ if (!token) {
   throw new Error("TELEGRAM_BOT_TOKEN не найден в .env!");
 }
 
-// Инициализируем бота в режиме webhook
-const bot = new TelegramBot(token, {
-  webHook: true
-});
+// Создаем бота без дополнительных настроек, так как веб-хук обрабатывается через Hapi
+const bot = new TelegramBot(token);
 
 // Обработчики сообщений
 bot.onText(/\/start/, async (msg) => {
