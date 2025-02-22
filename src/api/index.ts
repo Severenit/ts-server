@@ -12,7 +12,7 @@ interface WebhookInfo {
 }
 
 let server: Hapi.Server | null = null;
-const WEBHOOK_URL = `${process.env.VERCEL_URL}/webhook`;
+const WEBHOOK_URL = `${process.env.WEBHOOK_URL}/webhook`;
 
 async function ensureWebhook() {
   try {
@@ -46,6 +46,15 @@ const init = async () => {
       path: "/",
       handler: () => {
         return { status: "ok", message: "API работает на Vercel 🚀" };
+      },
+    });
+
+    // Основной API
+    server.route({
+      method: "GET",
+      path: "/api/health",
+      handler: () => {
+        return { status: "ok", message: "API здоров и работает на Vercel 🚀" };
       },
     });
 
