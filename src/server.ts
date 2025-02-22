@@ -1,28 +1,33 @@
+// Импорты необходимых модулей
 import Hapi from "@hapi/hapi";
-import TelegramBot, { Update } from "node-telegram-bot-api";
+import { Update } from "node-telegram-bot-api";
 import dotenv from "dotenv";
+import bot from "./bot"; 
+import { WEBHOOK_URL } from "./api/setWebhook";
 
+// Загрузка переменных окружения
 dotenv.config();
-console.log();
-const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN as string;
+
+// Конфигурационные параметры
 const USE_WEBHOOK = process.env.USE_WEBHOOK === "true";
 const PORT = process.env.PORT || 3000;
-const WEBHOOK_URL = process.env.WEBHOOK_URL as string;
 
-const bot = new TelegramBot(BOT_TOKEN, USE_WEBHOOK ? {} : { polling: true });
-
+// Настройка режима работы бота (webhook или long polling)
 if (USE_WEBHOOK) {
   bot.setWebHook(WEBHOOK_URL).then(() => console.log("Webhook установлен:", WEBHOOK_URL));
 } else {
   console.log("Бот запущен в режиме long polling");
 }
 
+// Инициализация и запуск сервера
 const init = async () => {
+  // Создание Hapi сервера
   const server = Hapi.server({
     port: PORT,
     host: process.env.ENV === "development" ? "localhost" : "0.0.0.0",
   });
 
+  // Маршрут для проверки работоспособности сервера
   server.route({
     method: "GET",
     path: "/",
@@ -31,6 +36,7 @@ const init = async () => {
     },
   });
 
+  // Маршрут для обработки webhook-сообщений от Telegram
   server.route({
     method: "POST",
     path: "/webhook",
@@ -46,12 +52,15 @@ const init = async () => {
     },
   });
 
+  // Запуск сервера
   await server.start();
   console.log(`Hapi сервер запущен на ${server.info.uri}`);
 
+  // Вывод информации о webhook URL в режиме webhook
   if (USE_WEBHOOK) {
     console.log(`Webhook URL: ${WEBHOOK_URL}`);
   }
 };
 
+// Запуск приложения
 init();
