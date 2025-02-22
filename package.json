@@ -10,6 +10,7 @@
     "vercel-build": "tsc"
   },
   "devDependencies": {
+    "@types/axios": "^0.9.36",
     "@types/hapi": "^18.0.0",
     "@types/node": "^20.0.0",
     "@types/node-telegram-bot-api": "^0.64.0",
@@ -19,6 +20,7 @@
   },
   "dependencies": {
     "@hapi/hapi": "^21.3.0",
+    "axios": "^1.7.9",
     "dotenv": "^16.4.0",
     "node-telegram-bot-api": "^0.66.0"
   },
