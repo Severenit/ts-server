@@ -8,8 +8,17 @@ if (!process.env.TELEGRAM_BOT_TOKEN) {
   process.exit(1);
 }
 
-// Инициализация Telegram бота
-const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { webHook: { port: 443 } });
+// Инициализация Telegram бота в режиме long polling
+const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { polling: true });
+
+// Обработчик сообщений
+bot.on('message', async (msg) => {
+  const chatId = msg.chat.id;
+  const text = msg.text;
+  
+  console.log('Received message:', text);
+  await bot.sendMessage(chatId, `Echo: ${text}`);
+});
 
 // Создание Hapi сервера
 const server = Hapi.server({
@@ -22,26 +31,10 @@ server.route({
   method: 'GET',
   path: '/',
   handler: (request, h) => {
-    return { status: 'ok' };
-  }
-});
-
-// Маршрут для webhook
-server.route({
-  method: 'POST',
-  path: '/webhook',
-  handler: async (request, h) => {
-    const update = request.payload as any;
-    
-    if (update?.message) {
-      const chatId = update.message.chat.id;
-      const text = update.message.text;
-      
-      console.log('Received message:', text);
-      await bot.sendMessage(chatId, `Echo: ${text}`);
-    }
-    
-    return { status: 'ok' };
+    return { 
+      status: 'ok',
+      message: 'Server is running'
+    };
   }
 });
 
@@ -50,11 +43,6 @@ const init = async () => {
   try {
     await server.start();
     console.log('Server running on %s', server.info.uri);
-    
-    // Установка webhook
-    const webhookUrl = `https://vite-server-rho.vercel.app/webhook`;
-    await bot.setWebHook(webhookUrl);
-    console.log('Webhook set successfully');
   } catch (err) {
     console.error('Error starting server:', err);
     process.exit(1);
