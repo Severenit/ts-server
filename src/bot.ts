@@ -8,15 +8,13 @@ if (!token) {
   throw new Error("TELEGRAM_BOT_TOKEN не найден в .env!");
 }
 
-// Настраиваем бота для работы с вебхуком
+// В режиме webhook нам не нужно указывать порт, так как мы используем внешний webhook
 const bot = new TelegramBot(token, {
-  webHook: {
-    port: process.env.PORT ? parseInt(process.env.PORT) : 3000
-  }
+  webHook: true // просто включаем режим webhook без указания порта
 });
 
 // Логируем информацию о боте при инициализации
-console.log('Bot initialized with webhook mode');
+console.log('Bot initialized in webhook mode');
 
 // Обработчики сообщений
 bot.onText(/\/start/, async (msg) => {
