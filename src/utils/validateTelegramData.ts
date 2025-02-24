@@ -8,7 +8,7 @@ export async function validateTelegramData(initData: string) {
     }
 
     const user = JSON.parse(decodeURIComponent(userStr));
-    console.log('Parsed user data:', user);
+
     return user;
   } catch (error) {
     console.error('Error validating Telegram data:', error);

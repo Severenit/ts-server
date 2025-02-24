@@ -81,29 +81,7 @@ export const createServer = async () => {
   server.route(routes);
   
   await server.initialize(); // Не стартуем сервер сразу (для Vercel)
-    await ensureWebhook(); // 🔥 Автоматическая регистрация Webhook
+  await ensureWebhook(); // 🔥 Автоматическая регистрация Webhook
   
-    // Добавляем глобальную обработку CORS
-    server.ext('onPreResponse', (request, h) => {
-      const response = request.response;
-      if (request.method === 'options') {
-        return h.response()
-          .header('Access-Control-Allow-Origin', request.headers.origin || 'https://triple-triad-tg-game.netlify.app')
-          .header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-          .header('Access-Control-Allow-Headers', 'Content-Type, telegram-data, Authorization')
-          .header('Access-Control-Allow-Credentials', 'true')
-          .header('Access-Control-Max-Age', '86400')
-          .code(200);
-      }
-
-      if (h.response) {
-        const responseHeaders = h.response as any;
-        responseHeaders.header('Access-Control-Allow-Origin', request.headers.origin || 'https://triple-triad-tg-game.netlify.app');
-        responseHeaders.header('Access-Control-Allow-Credentials', 'true');
-      }
-
-      return h.continue;
-    });
-  
-    return server;
-  };
+  return server;
+};

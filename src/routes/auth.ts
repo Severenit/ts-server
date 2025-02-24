@@ -21,7 +21,8 @@ export const authRoutes: Record<string, ServerRoute> = {
           });
         }
 
-        console.log('📌: Received Telegram data:', telegramData);
+        // TODO: Remove next line
+        // console.log('📌: Received Telegram data:', telegramData);
 
         const user = await validateTelegramData(telegramData);
         if (!user) {
@@ -35,6 +36,11 @@ export const authRoutes: Record<string, ServerRoute> = {
         }
 
         console.log('📌: Validated Telegram data:', user);
+
+        return {
+          status: 'ok',
+          player: user,
+        }
       } catch (e) {
 
       }
