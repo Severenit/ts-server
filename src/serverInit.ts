@@ -37,11 +37,11 @@ export const createServer = async () => {
       host: process.env.ENV === "development" ? "localhost" : "0.0.0.0",
       routes: {
         cors: {
-          origin: ['*'],
+          origin: ['https://triple-triad-tg-game.netlify.app', 'http://localhost:5173'],
           credentials: true,
-          additionalExposedHeaders: ['content-encoding'],
-          exposedHeaders: ['content-encoding'],
-          additionalHeaders: ['telegram-data']
+          additionalHeaders: ['telegram-data', 'content-type'],
+          maxAge: 600,
+          headers: ['Accept', 'Content-Type', 'Authorization', 'telegram-data']
         },
         response: {
           emptyStatusCode: 204
