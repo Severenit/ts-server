@@ -1,10 +1,11 @@
 import TelegramBot from "node-telegram-bot-api";
 import dotenv from "dotenv";
+import { generateInitData } from './utils/generateInitData.js';
 
 dotenv.config();
 
-const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN as string;
-const WEBAPP_URL = process.env.WEBAPP_URL as string || 'https://triple-triad-tg-app.netlify.app/';
+export const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN as string;
+const WEBAPP_URL = process.env.WEBAPP_URL as string || 'https://triple-triad-tg-game.netlify.app/';
 
 if (!BOT_TOKEN) {
   throw new Error("TELEGRAM_BOT_TOKEN не найден в .env!");
@@ -24,6 +25,33 @@ const bot = new TelegramBot(BOT_TOKEN);
 // });
 
 bot.onText(/\/start/, async (msg) => {
+  const initData = generateInitData(msg.from!);
+  // Преобразуем user в строку (JSON) и кодируем
+  const encodedUser = encodeURIComponent(JSON.stringify(initData.user));
+  // Формируем query string
+  const params = new URLSearchParams({
+    query_id: initData.query_id,
+    auth_date: String(initData.auth_date),
+    user: encodedUser,
+    signature: initData.signature,
+    hash: initData.hash
+  }).toString();
+
+  const chatId = msg.chat.id;
+
+  await bot.sendMessage(chatId, 'Добро пожаловать в Triple Triad! Начнем игру!', {
+    reply_markup: {
+      keyboard: [
+        [
+          { text: 'Открыть игру', web_app: { url: `${WEBAPP_URL}?${params}` } },
+        ]
+      ],
+      resize_keyboard: true,
+    }
+  });
+});
+
+bot.onText(/\/btn/, async (msg) => {
   const chatId = msg.chat.id;
   await bot.sendMessage(chatId, 'Добро пожаловать в Triple Triad! Начнем игру!', {
     reply_markup: {
@@ -33,13 +61,8 @@ bot.onText(/\/start/, async (msg) => {
         ]
       ],
       resize_keyboard: true,
-      inline_keyboard: [
-        [
-          { text: 'Открыть игру', web_app: { url: WEBAPP_URL } },
-        ]
-      ]
     }
-  });
+  })
 });
 
 bot.onText(/\/help/, async (msg) => {

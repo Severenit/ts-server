@@ -35,6 +35,18 @@ export const createServer = async () => {
     const server = Hapi.server({
       port: process.env.PORT || 3000,
       host: process.env.ENV === "development" ? "localhost" : "0.0.0.0",
+      routes: {
+        cors: {
+          origin: ['*'],
+          credentials: true,
+          additionalExposedHeaders: ['content-encoding'],
+          exposedHeaders: ['content-encoding'],
+          additionalHeaders: ['telegram-data']
+        },
+        response: {
+          emptyStatusCode: 204
+        }
+      }
     });
   
     // API-запрос для проверки работы сервера
