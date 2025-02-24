@@ -1,9 +1,28 @@
 {
   "version": 2,
   "builds": [
-    { "src": "src/api/index.ts", "use": "@vercel/node" }
+    { "src": "src/**/*.ts", "use": "@vercel/node" }
   ],
   "routes": [
-    { "src": "/(.*)", "dest": "src/api/index.ts" }
+    {
+      "src": "/api/(.*)",
+      "dest": "/src/api/$1.ts",
+      "headers": {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+        "Access-Control-Allow-Headers": "X-Requested-With, Content-Type, Accept, telegram-data",
+        "Access-Control-Allow-Credentials": "true"
+      }
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/src/api/index.ts",
+      "headers": {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+        "Access-Control-Allow-Headers": "X-Requested-With, Content-Type, Accept, telegram-data",
+        "Access-Control-Allow-Credentials": "true"
+      }
+    }
   ]
 }
