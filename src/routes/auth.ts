@@ -1,6 +1,7 @@
 import { Request, ResponseToolkit, ServerRoute } from '@hapi/hapi';
 import { errorHandler } from '../utils/error.js';
 import { validateTelegramData } from '../utils/validateTelegramData.js';
+import { getOrCreatePlayer } from '../keystone-api/user.js';
 
 export const authRoutes: Record<string, ServerRoute> = {
   init: {
@@ -21,7 +22,8 @@ export const authRoutes: Record<string, ServerRoute> = {
           });
         }
 
-        console.log('📌: Received Telegram data:', telegramData);
+        // TODO: Remove next line
+        // console.log('📌: Received Telegram data:', telegramData);
 
         const user = await validateTelegramData(telegramData);
         if (!user) {
@@ -35,11 +37,28 @@ export const authRoutes: Record<string, ServerRoute> = {
         }
 
         console.log('📌: Validated Telegram data:', user);
-      } catch (e) {
 
-      }
-      return {
-        status: 'ok'
+        const player = await getOrCreatePlayer({
+          id: user.id,
+          username: user.username,
+          first_name: user.first_name,
+          last_name: user.last_name,
+          photo_url: user.photo_url,
+          hash: user.hash,
+        });
+        console.log('📌: Player created/found:', player);
+
+        return {
+          status: 'ok',
+          player,
+        }
+      } catch (e) {
+        console.error('❌: Error validating Telegram data:', e);
+        return errorHandler({
+          h,
+          details: 'Failed to validate Telegram data',
+          error: e
+        });
       }
     }
   },
