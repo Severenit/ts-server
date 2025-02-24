@@ -40,11 +40,14 @@ export const createServer = async () => {
           origin: ['https://triple-triad-tg-game.netlify.app', 'http://localhost:5173'],
           credentials: true,
           additionalHeaders: ['telegram-data', 'content-type'],
-          maxAge: 600,
-          headers: ['Accept', 'Content-Type', 'Authorization', 'telegram-data']
+          exposedHeaders: ['telegram-data', 'content-type'],
+          additionalExposedHeaders: ['telegram-data'],
         },
-        response: {
-          emptyStatusCode: 204
+        validate: {
+          failAction: async (request, h, err) => {
+            console.error('Validation error:', err);
+            throw err;
+          }
         }
       }
     });
@@ -82,6 +85,18 @@ export const createServer = async () => {
   
   await server.initialize(); // Не стартуем сервер сразу (для Vercel)
     await ensureWebhook(); // 🔥 Автоматическая регистрация Webhook
+  
+    // Добавляем предварительную обработку для OPTIONS запросов
+    server.ext('onPreResponse', (request, h) => {
+      const response = request.response;
+      if (request.method === 'options') {
+        return h.response()
+          .header('Access-Control-Allow-Methods', 'POST, GET, OPTIONS')
+          .header('Access-Control-Allow-Headers', 'telegram-data, content-type')
+          .code(200);
+      }
+      return h.continue;
+    });
   
     return server;
   };
