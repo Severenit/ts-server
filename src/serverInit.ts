@@ -36,19 +36,7 @@ export const createServer = async () => {
       port: process.env.PORT || 3000,
       host: process.env.ENV === "development" ? "localhost" : "0.0.0.0",
       routes: {
-        cors: {
-          origin: ['https://triple-triad-tg-game.netlify.app', 'http://localhost:5173'],
-          credentials: true,
-          additionalHeaders: ['telegram-data', 'content-type'],
-          exposedHeaders: ['telegram-data', 'content-type'],
-          additionalExposedHeaders: ['telegram-data'],
-        },
-        validate: {
-          failAction: async (request, h, err) => {
-            console.error('Validation error:', err);
-            throw err;
-          }
-        }
+        cors: false // Отключаем встроенный CORS Hapi
       }
     });
   
@@ -86,15 +74,25 @@ export const createServer = async () => {
   await server.initialize(); // Не стартуем сервер сразу (для Vercel)
     await ensureWebhook(); // 🔥 Автоматическая регистрация Webhook
   
-    // Добавляем предварительную обработку для OPTIONS запросов
+    // Добавляем глобальную обработку CORS
     server.ext('onPreResponse', (request, h) => {
       const response = request.response;
       if (request.method === 'options') {
         return h.response()
-          .header('Access-Control-Allow-Methods', 'POST, GET, OPTIONS')
-          .header('Access-Control-Allow-Headers', 'telegram-data, content-type')
+          .header('Access-Control-Allow-Origin', request.headers.origin || 'https://triple-triad-tg-game.netlify.app')
+          .header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+          .header('Access-Control-Allow-Headers', 'Content-Type, telegram-data, Authorization')
+          .header('Access-Control-Allow-Credentials', 'true')
+          .header('Access-Control-Max-Age', '86400')
           .code(200);
       }
+
+      if (h.response) {
+        const responseHeaders = h.response as any;
+        responseHeaders.header('Access-Control-Allow-Origin', request.headers.origin || 'https://triple-triad-tg-game.netlify.app');
+        responseHeaders.header('Access-Control-Allow-Credentials', 'true');
+      }
+
       return h.continue;
     });
   
