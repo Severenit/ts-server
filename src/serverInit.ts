@@ -36,7 +36,16 @@ export const createServer = async () => {
       port: process.env.PORT || 3000,
       host: process.env.ENV === "development" ? "localhost" : "0.0.0.0",
       routes: {
-        cors: false // Отключаем встроенный CORS Hapi
+        cors: {
+          origin: ['*'],
+          credentials: true,
+          additionalExposedHeaders: ['content-encoding'],
+          exposedHeaders: ['content-encoding'],
+          additionalHeaders: ['telegram-data']
+        },
+        response: {
+          emptyStatusCode: 204
+        }
       }
     });
   
