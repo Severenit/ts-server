@@ -2,6 +2,7 @@ import { Card } from '../game/core/card.js';
 import { client } from './index.js';
 import { GET_USER_CARDS } from '../graphql/user.js';
 
+
 export async function getPlayerCards(telegramId: string) {
   try {
     // Получаем карты из базы данных

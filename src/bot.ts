@@ -52,12 +52,23 @@ bot.onText(/\/start/, async (msg) => {
 });
 
 bot.onText(/\/btn/, async (msg) => {
+  const initData = generateInitData(msg.from!);
+  // Преобразуем user в строку (JSON) и кодируем
+  const encodedUser = encodeURIComponent(JSON.stringify(initData.user));
+  // Формируем query string
+  const params = new URLSearchParams({
+    query_id: initData.query_id,
+    auth_date: String(initData.auth_date),
+    user: encodedUser,
+    signature: initData.signature,
+    hash: initData.hash
+  }).toString();
   const chatId = msg.chat.id;
   await bot.sendMessage(chatId, 'Добро пожаловать в Triple Triad! Начнем игру!', {
     reply_markup: {
-      keyboard: [
+      inline_keyboard: [
         [
-          { text: 'Открыть игру', web_app: { url: WEBAPP_URL } },
+          { text: 'Открыть игру', web_app: { url: `${WEBAPP_URL}?${params}` } },
         ]
       ],
       resize_keyboard: true,

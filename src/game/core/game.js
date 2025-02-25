@@ -713,5 +713,3 @@ export class Game {
         return score;
     }
 }
-
-module.exports = Game; 

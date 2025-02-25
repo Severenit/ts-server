@@ -38,12 +38,8 @@ export const cardsRoutes: Record<string, ServerRoute> = {
         handler: async (request: Request, h: ResponseToolkit) => {
             try {
                 const { telegramId } = request.params;
-                console.log('Getting cards for telegram user:', telegramId);
-
                 // Получаем карты игрока с полной информацией
                 const cards = await getPlayerCards(telegramId);
-                console.log('Found cards:', cards);
-
                 return {
                     status: 'success',
                     cards: cards

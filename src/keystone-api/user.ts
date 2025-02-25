@@ -1,10 +1,9 @@
 // Получение или создание игрока
 import { client } from './index.js';
-import { ADD_CARD_TO_USER, CREATE_USER, GET_USER } from '../graphql/user.js';
+import { ADD_CARD_TO_USER, CREATE_USER, DELETE_PLAYER_CARD, GET_PLAYER_CARD, GET_USER } from '../graphql/user.js';
 import bot from '../bot.js';
 import { Card } from '../game/core/card.js';
 import { User } from '../types/user.js';
-import { generateInitData } from '../utils/generateInitData.js';
 
 interface UserResponse {
   user: User | null;
@@ -21,7 +20,6 @@ interface GetOrCreatePlayerProps {
 }
 
 export async function getOrCreatePlayer(telegramData: GetOrCreatePlayerProps) {
-  console.log('telegramData:', telegramData);
   try {
     // Сначала пытаемся найти существующего пользователя
     const existingUserData = await client.request<UserResponse>(GET_USER, {
@@ -130,7 +128,7 @@ export async function getOrCreatePlayer(telegramData: GetOrCreatePlayerProps) {
   }
 }
 
-async function addCardToPlayer(playerId: string, cardId: string) {
+export async function addCardToPlayer(playerId: string, cardId: string) {
   try {
     console.log(`🌐: Attempting to add card ${cardId} to player ${playerId}`);
     const data = await client.request<{ createPlayerCard: { cardId: string } }>(ADD_CARD_TO_USER, {
@@ -147,5 +145,48 @@ async function addCardToPlayer(playerId: string, cardId: string) {
   } catch (error) {
     console.error(`❌: Error adding card ${cardId} to player ${playerId}:`, error);
     throw error; // Пробрасываем ошибку дальше для обработки выше
+  }
+}
+
+// Удаление карты у игрока
+export async function deletePlayerCard(userId: string, cardId: string) {
+  try {
+    console.log(`🎮 Finding card ${cardId} for player ${userId}`);
+
+    // Сначала находим ID карты игрока
+    interface PlayerCardResponse {
+      playerCards: Array<{ id: string }>;
+    }
+
+    const cardData = await client.request<PlayerCardResponse>(GET_PLAYER_CARD, {
+      userId,
+      cardId: cardId.toString()
+    });
+
+    if (!cardData.playerCards || cardData.playerCards.length === 0) {
+      throw new Error(`Card ${cardId} not found for player ${userId}`);
+    }
+
+    // Берем первую найденную карту (должна быть только одна)
+    const playerCardId = cardData.playerCards[0].id;
+
+    console.log(`🎮 Deleting player card with ID: ${playerCardId}`);
+
+    // Теперь удаляем карту по её уникальному ID
+    interface DeleteCardResponse {
+      deletePlayerCard: {
+        id: string;
+      };
+    }
+
+    const data = await client.request<DeleteCardResponse>(DELETE_PLAYER_CARD, {
+      id: playerCardId
+    });
+
+    console.log('🎮 Card deleted:', data);
+    return data.deletePlayerCard;
+  } catch (error) {
+    console.error('❌ Error deleting player card:', error);
+    throw error;
   }
 }

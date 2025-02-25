@@ -8,35 +8,30 @@ export const authRoutes: Record<string, ServerRoute> = {
     method: 'POST' as const,
     path: '/api/auth',
     handler: async (request: Request, h: ResponseToolkit) => {
-      console.log('📌: Received auth request');
+      console.log('📌: \'/api/auth\' Получен запрос на авторизацию');
       try {
         const telegramData = request.headers['telegram-data'];
 
         if (!telegramData) {
-          console.log('❌: No Telegram data in headers');
+          console.log('❌: В заголовках нет данных Telegram');
           return errorHandler({
             h,
-            details: 'No Telegram data provided',
-            error: 'Telegram-Data header is required',
+            details: 'Необходимо указать заголовок Telegram-Data',
+            error: 'Telegram-Data заголовок обязательный',
             code: 400,
           });
         }
 
-        // TODO: Remove next line
-        // console.log('📌: Received Telegram data:', telegramData);
-
         const user = await validateTelegramData(telegramData);
         if (!user) {
-          console.log('❌: Invalid Telegram data');
+          console.log('❌: Неверные данные Telegram');
           return errorHandler({
             h,
-            details: 'Invalid Telegram data',
-            error: 'Invalid Telegram data',
+            details: 'Неверные данные Telegram',
+            error: 'Неверные данные Telegram',
             code: 400
           })
         }
-
-        console.log('📌: Validated Telegram data:', user);
 
         const player = await getOrCreatePlayer({
           id: user.id,
@@ -46,47 +41,72 @@ export const authRoutes: Record<string, ServerRoute> = {
           photo_url: user.photo_url,
           hash: user.hash,
         });
-        console.log('📌: Player created/found:', player);
 
         return {
-          status: 'ok',
+          status: 'success',
           player,
         }
       } catch (e) {
-        console.error('❌: Error validating Telegram data:', e);
+        console.error('❌: Ошибка валидации данных Telegram:', e);
         return errorHandler({
           h,
-          details: 'Failed to validate Telegram data',
+          details: 'Не удалось отвалидировать данные Telegram',
           error: e
         });
       }
     }
   },
   getUserData: {
-    method: 'GET' as const,
+    method: 'GET',
     path: '/api/users/{telegram_id}',
-    handler: async (request: Request, h: ResponseToolkit) => {
+    handler: async (request, h) => {
       try {
         const { telegram_id } = request.params;
-        console.log('📌: Getting user data for telegram_id:', telegram_id);
+        console.log('📌: \'/api/users/{telegram_id}\' Получение данных пользователя для telegram_id:', telegram_id);
 
-        return {
-          status: 'ok',
-          data: {
-            telegram_id,
-            username: 'username',
-            first_name: 'first_name',
-            last_name: 'last_name'
-          }
+        // Получаем данные игрока
+        const player = await getOrCreatePlayer({
+          id: telegram_id
+        });
+
+        if (!player) {
+          return errorHandler({
+            h,
+            details: `Не найден пользователь с telegram_id: ${telegram_id}`,
+            error: 'Пользователь не найден',
+            code: 404,
+          });
         }
+
+        // Получаем карты игрока
+        const cards = player.cards;
+
+        // Формируем ответ
+        const response = {
+          status: 'success',
+          player: {
+            id: player.id,
+            telegram_id: player.telegram_id,
+            username: player.username,
+            first_name: player.first_name,
+            last_name: player.last_name,
+            created_at: player.created_at,
+            photo_url: player.photo_url,
+            cards,
+            stats: player.stats,
+            activeGame: player?.activeGame || null,
+          }
+        };
+
+        return response;
+
       } catch (error) {
         console.error('❌: Error getting user data:', error);
-        return errorHandler({
-          h,
-          details: 'Failed to get user data',
-          error
-        });
+        return h.response({
+          error: 'Failed to get user data',
+          details: error instanceof Error ? error.message : 'Unknown error'
+        }).code(500);
       }
     }
-  },
+  }
 }

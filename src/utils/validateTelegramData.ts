@@ -2,6 +2,7 @@ export async function validateTelegramData(initData: string) {
   try {
     const params = new URLSearchParams(initData);
     const userStr = params.get('user');
+
     if (!userStr) {
       console.error('No user data in initData');
       return false;
