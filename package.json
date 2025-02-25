@@ -23,6 +23,7 @@
     "typescript": "^5.0.0"
   },
   "dependencies": {
+    "@hapi/inert": "^7.1.0",
     "axios": "^1.7.9",
     "dotenv": "^16.4.0",
     "graphql": "^16.10.0",
