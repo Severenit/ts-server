@@ -383,8 +383,23 @@ export const gameRoutes: Record<string, ServerRoute> = {
                   const savedState = activeGame.gameState;
                   game = new Game(savedState.settings || {}, savedState.rules || {});
 
+                  // Проверяем и восстанавливаем доску
+                  if (!Array.isArray(savedState.board)) {
+                      await sendLogToTelegram('⚠️ Доска в сохраненном состоянии не является массивом', {
+                          board: savedState.board,
+                          type: typeof savedState.board
+                      });
+                      game.board = Array(9).fill(null);
+                  } else if (savedState.board.length !== 9) {
+                      await sendLogToTelegram('⚠️ Некорректная длина доски', {
+                          length: savedState.board.length
+                      });
+                      game.board = Array(9).fill(null);
+                  } else {
+                      game.board = savedState.board;
+                  }
+
                   // Восстанавливаем карты с проверкой на null
-                  game.board = restoreCards(savedState.board);
                   game.playerHand = restoreCards(savedState.playerHand);
                   game.aiHand = restoreCards(savedState.aiHand);
 
@@ -398,73 +413,104 @@ export const gameRoutes: Record<string, ServerRoute> = {
                       game.originalAiCards = game.aiHand.map((card: Card) => card.clone());
                   }
 
-                  // Инициализируем доску, если она пуста
-                  if (!game.board || !Array.isArray(game.board) || game.board.length === 0) {
-                      await sendLogToTelegram('⚠️ Доска не инициализирована или пуста, инициализируем новую доску');
-                      game.board = Array(9).fill(null);
-                      
-                      // Проверяем инициализацию
-                      if (!Array.isArray(game.board) || game.board.length !== 9) {
-                          await sendLogToTelegram('❌ Ошибка инициализации доски', {
-                              board: game.board,
-                              isArray: Array.isArray(game.board),
-                              length: game.board?.length
-                          });
-                          return errorHandler({
-                              h,
-                              details: 'Failed to initialize game board',
-                              error: 'Game state error',
-                              code: 500
-                          });
-                      }
-                  }
+                  // Восстанавливаем остальное состояние
+                  game.currentTurn = savedState.currentTurn || 'player';
+                  game.playerScore = savedState.playerScore || 5;
+                  game.aiScore = savedState.aiScore || 5;
+                  game.gameStatus = savedState.gameStatus || 'playing';
+                  game.winner = savedState.winner || null;
+                  game.suddenDeathRound = savedState.suddenDeathRound || 0;
+                  game.boardElements = Array.isArray(savedState.boardElements) ? savedState.boardElements : Array(9).fill(null);
+                  game.cardExchange = savedState.cardExchange || null;
 
-                  // Проверяем состояние перед ходом AI
-                  const gameStateBeforeMove = {
+                  // Проверяем состояние перед сохранением
+                  const validationState = {
                       board: {
-                          content: game.board,
-                          length: game.board.length,
-                          nullCount: game.board.filter(cell => cell === null).length
+                          isArray: Array.isArray(game.board),
+                          length: game.board?.length,
+                          content: game.board
                       },
                       aiHand: {
-                          cards: game.aiHand?.map(c => c?.id),
-                          length: game.aiHand?.length
+                          isArray: Array.isArray(game.aiHand),
+                          length: game.aiHand?.length,
+                          cards: game.aiHand?.map((c: Card | null) => c?.id)
                       },
-                      availablePositions: game.board
-                          .map((cell, index) => ({ pos: index, isEmpty: cell === null }))
-                          .filter(pos => pos.isEmpty)
-                          .map(pos => pos.pos)
+                      currentTurn: game.currentTurn
                   };
 
-                  await sendLogToTelegram('🎮 Подробное состояние перед ходом AI', gameStateBeforeMove);
+                  await sendLogToTelegram('🔍 Валидация состояния игры перед сохранением', validationState);
 
-                  if (gameStateBeforeMove.availablePositions.length === 0) {
-                      await sendLogToTelegram('❌ Нет доступных позиций для хода', gameStateBeforeMove);
+                  if (!Array.isArray(game.board) || game.board.length !== 9) {
+                      await sendLogToTelegram('❌ Критическая ошибка: некорректная доска после восстановления');
                       return errorHandler({
                           h,
-                          details: 'No available positions for move',
+                          details: 'Invalid board state after restoration',
                           error: 'Game state error',
-                          code: 400
+                          code: 500
                       });
                   }
 
-                  if (!game.aiHand || game.aiHand.length === 0) {
-                      await sendLogToTelegram('❌ Рука AI пуста', gameStateBeforeMove);
-                      return errorHandler({
-                          h,
-                          details: 'AI has no cards',
-                          error: 'Game state error',
-                          code: 400
-                      });
-                  }
+                  // Сохраняем восстановленное состояние
+                  gameStates.set(gameId, game);
+              }
 
+              if (game.currentTurn !== 'ai') {
+                  return h.response({
+                      error: 'Not AI\'s turn',
+                      details: {
+                          currentTurn: game.currentTurn
+                      }
+                  }).code(400);
+              }
+
+              // Проверяем состояние перед ходом AI
+              const gameStateBeforeMove = {
+                  board: {
+                      isArray: Array.isArray(game.board),
+                      length: game.board.length,
+                      content: game.board,
+                      nullPositions: game.board
+                          .map((cell: Card | null, index: number) => ({ pos: index, isEmpty: cell === null }))
+                          .filter((pos: { pos: number; isEmpty: boolean }) => pos.isEmpty)
+                          .map((pos: { pos: number }) => pos.pos)
+                  },
+                  aiHand: {
+                      length: game.aiHand?.length,
+                      cards: game.aiHand?.map((c: Card | null) => c?.id)
+                  },
+                  currentTurn: game.currentTurn
+              };
+
+              await sendLogToTelegram('🎮 Подробное состояние перед ходом AI', gameStateBeforeMove);
+
+              if (gameStateBeforeMove.board.nullPositions.length === 0) {
+                  await sendLogToTelegram('❌ Нет доступных позиций для хода', gameStateBeforeMove);
+                  return errorHandler({
+                      h,
+                      details: 'No available positions for move',
+                      error: 'Game state error',
+                      code: 400
+                  });
+              }
+
+              if (!game.aiHand || game.aiHand.length === 0) {
+                  await sendLogToTelegram('❌ Рука AI пуста', gameStateBeforeMove);
+                  return errorHandler({
+                      h,
+                      details: 'AI has no cards',
+                      error: 'Game state error',
+                      code: 400
+                  });
+              }
+
+              try {
                   const result = game.makeAIMove();
 
                   // Логируем результат хода
                   await sendLogToTelegram('✅ Ход AI выполнен', {
                       moveResult: result,
                       newBoardState: game.board?.map((c: Card | null) => c?.id),
-                      remainingAiCards: game.aiHand?.map((c: Card) => c?.id)
+                      remainingAiCards: game.aiHand?.map((c: Card | null) => c?.id)
                   });
 
                   // Обновляем состояние в базе данных
@@ -479,59 +525,13 @@ export const gameRoutes: Record<string, ServerRoute> = {
                       gameState: game.getState(),
                       moveResult: result
                   };
+              } catch (error) {
+                  await sendLogToTelegram('❌ Ошибка при выполнении хода AI', {
+                      error: error instanceof Error ? error.message : 'Unknown error',
+                      gameState: gameStateBeforeMove
+                  });
+                  throw error;
               }
-
-              if (game.currentTurn !== 'ai') {
-                  return h.response({
-                      error: 'Not AI\'s turn',
-                      details: {
-                          currentTurn: game.currentTurn
-                      }
-                  }).code(400);
-              }
-
-              // Проверяем состояние перед ходом AI
-              await sendLogToTelegram('🎮 Состояние перед ходом AI', {
-                  aiHandLength: game.aiHand?.length,
-                  aiCards: game.aiHand?.map((c: Card) => c?.id),
-                  boardState: game.board?.map((c: Card | null) => c?.id),
-                  availablePositions: game.board?.map((c: Card | null, i: number) => ({ pos: i, isEmpty: !c }))
-                      .filter(pos => pos.isEmpty)
-                      .map(pos => pos.pos),
-                  currentTurn: game.currentTurn
-              });
-
-              // Проверяем, остались ли у AI карты для хода
-              if (!game.aiHand || game.aiHand.length === 0) {
-                  return h.response({
-                      error: 'AI has no cards left',
-                      details: {
-                          gameState: game.getState()
-                      }
-                  }).code(400);
-              }
-
-              const result = game.makeAIMove();
-
-              // Логируем результат хода
-              await sendLogToTelegram('✅ Ход AI выполнен', {
-                  moveResult: result,
-                  newBoardState: game.board?.map((c: Card | null) => c?.id),
-                  remainingAiCards: game.aiHand?.map((c: Card) => c?.id)
-              });
-
-              // Обновляем состояние в базе данных
-              await createActiveGame(
-                  game.settings.userId,
-                  gameId,
-                  game.getState()
-              );
-
-              return {
-                  status: 'move completed',
-                  gameState: game.getState(),
-                  moveResult: result
-              };
           } catch (error) {
               console.error('❌ Error in AI move:', error);
               return errorHandler({
