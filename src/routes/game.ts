@@ -579,16 +579,31 @@ export const gameRoutes: Record<string, ServerRoute> = {
 
                   console.log('🔍 Original AI cards before restoration:', game.originalAiCards);
                   console.log('🔍 Searching for card:', cardId);
-                  const selectedCard = game.originalAiCards.filter((card: Card | null): card is Card => {
-                      const isValid = card !== null;
-                      console.log(`Card ${card?.id}: ${isValid ? 'valid' : 'invalid'}`);
-                      return isValid;
-                  }).find((card: Card) => {
+
+                  // Создаем новую колоду для сравнения
+                  const deck = Card.createDeck();
+                  const deckCard = deck.find(c => c.id === cardId);
+
+                  if (!deckCard) {
+                      return errorHandler({
+                          h,
+                          details: `Карта с ID ${cardId} не найдена в колоде`,
+                          error: 'Неверный ID карты',
+                          code: 400
+                      });
+                  }
+
+                  // Проверяем наличие карты в оригинальных картах AI
+                  const selectedCard = game.originalAiCards.find((card: Card | null) => {
+                      if (!card) {
+                          console.log('⚠️ Found null card in originalAiCards');
+                          return false;
+                      }
                       const isMatch = card.id === cardId;
                       console.log(`Comparing card ${card.id} with ${cardId}: ${isMatch}`);
                       return isMatch;
                   });
-                  
+
                   if (!selectedCard) {
                       return errorHandler({
                           h,
@@ -598,18 +613,8 @@ export const gameRoutes: Record<string, ServerRoute> = {
                       });
                   }
 
-                  // Проверяем, что у карты есть метод clone
-                  if (typeof selectedCard.clone !== 'function') {
-                      console.error('Selected card does not have clone method:', selectedCard);
-                      return errorHandler({
-                          h,
-                          details: 'Выбранная карта некорректна',
-                          error: 'Ошибка состояния игры',
-                          code: 500
-                      });
-                  }
-
-                  const clonedCard = selectedCard.clone();
+                  // Используем карту из колоды для клонирования
+                  const clonedCard = deckCard.clone();
                   if (!clonedCard) {
                       return errorHandler({
                           h,
@@ -618,6 +623,11 @@ export const gameRoutes: Record<string, ServerRoute> = {
                           code: 500
                       });
                   }
+
+                  // Копируем необходимые свойства из выбранной карты
+                  clonedCard.owner = selectedCard.owner;
+                  // @ts-expect-error
+                  clonedCard.position = selectedCard.position;
 
                   exchangeResult = {
                       type: 'player_win',
