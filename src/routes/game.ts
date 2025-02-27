@@ -40,10 +40,8 @@ function restoreCards(cards: PlayerCard[]) {
   console.log('🎴 Available deck cards:', deck.map((c: Card) => c.id));
   
   return cards.map(cardData => {
+    // Если это пустая позиция на доске, просто возвращаем null без логирования
     if (!cardData) {
-      const message = '⚠️ Card data is null';
-      console.log(message);
-      sendLogToTelegram(message);
       return null;
     }
 
