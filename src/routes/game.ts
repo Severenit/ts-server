@@ -226,8 +226,27 @@ export const gameRoutes: Record<string, ServerRoute> = {
             savedState.rules || {},
           );
 
+          // Инициализируем пустую доску
+          game.board = Array(9).fill(null);
+
+          // Проверяем и восстанавливаем доску из сохраненного состояния
+          if (Array.isArray(savedState.board) && savedState.board.length === 9) {
+              const restoredBoard = restoreCards(savedState.board);
+              // Копируем только валидные карты, сохраняя null для пустых позиций
+              savedState.board.forEach((card, index) => {
+                  if (card) {
+                      game.board[index] = restoredBoard.find(c => c.id === card.id) || null;
+                  }
+              });
+          }
+
+          await sendLogToTelegram('🎮 Состояние доски после инициализации', {
+              board: game.board,
+              length: game.board.length,
+              nullCount: game.board.filter(cell => cell === null).length
+          });
+
           // Восстанавливаем карты
-          game.board = restoreCards(savedState.board);
           game.playerHand = restoreCards(savedState.playerHand);
           game.aiHand = restoreCards(savedState.aiHand);
           game.originalPlayerCards = restoreCards(savedState.originalPlayerCards);
