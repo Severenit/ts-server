@@ -399,41 +399,47 @@ export const gameRoutes: Record<string, ServerRoute> = {
                   }
 
                   // Инициализируем доску, если она пуста
-                  if (!game.board || game.board.length === 0) {
-                      await sendLogToTelegram('⚠️ Доска пуста, инициализируем новую доску');
-                      game.board = new Array(9).fill(null);
+                  if (!game.board || !Array.isArray(game.board) || game.board.length === 0) {
+                      await sendLogToTelegram('⚠️ Доска не инициализирована или пуста, инициализируем новую доску');
+                      game.board = Array(9).fill(null);
+                      
+                      // Проверяем инициализацию
+                      if (!Array.isArray(game.board) || game.board.length !== 9) {
+                          await sendLogToTelegram('❌ Ошибка инициализации доски', {
+                              board: game.board,
+                              isArray: Array.isArray(game.board),
+                              length: game.board?.length
+                          });
+                          return errorHandler({
+                              h,
+                              details: 'Failed to initialize game board',
+                              error: 'Game state error',
+                              code: 500
+                          });
+                      }
                   }
 
-                  // Проверяем состояние игры после восстановления
-                  const gameState = {
+                  // Проверяем состояние перед ходом AI
+                  const gameStateBeforeMove = {
                       board: {
-                          length: game.board?.length,
-                          cards: game.board?.map((c: Card | null) => c?.id),
-                          nullCount: game.board?.filter((c: Card | null) => !c).length,
-                          positions: game.board?.map((c: Card | null, index: number) => ({
-                              position: index,
-                              hasCard: !!c
-                          }))
+                          content: game.board,
+                          length: game.board.length,
+                          nullCount: game.board.filter(cell => cell === null).length
                       },
                       aiHand: {
-                          length: game.aiHand?.length,
-                          cards: game.aiHand?.map((c: Card) => c?.id),
-                          nullCount: game.aiHand?.filter((c: Card) => !c).length
+                          cards: game.aiHand?.map(c => c?.id),
+                          length: game.aiHand?.length
                       },
-                      currentTurn: game.currentTurn,
-                      gameStatus: game.gameStatus
+                      availablePositions: game.board
+                          .map((cell, index) => ({ pos: index, isEmpty: cell === null }))
+                          .filter(pos => pos.isEmpty)
+                          .map(pos => pos.pos)
                   };
 
-                  await sendLogToTelegram('🎮 Состояние игры после восстановления', gameState);
+                  await sendLogToTelegram('🎮 Подробное состояние перед ходом AI', gameStateBeforeMove);
 
-                  // Проверяем доступные позиции для хода
-                  const availablePositions = game.board
-                      .map((card: Card | null, index: number) => ({ position: index, isEmpty: !card }))
-                      .filter(pos => pos.isEmpty)
-                      .map(pos => pos.position);
-
-                  if (availablePositions.length === 0) {
-                      await sendLogToTelegram('❌ Нет доступных позиций для хода');
+                  if (gameStateBeforeMove.availablePositions.length === 0) {
+                      await sendLogToTelegram('❌ Нет доступных позиций для хода', gameStateBeforeMove);
                       return errorHandler({
                           h,
                           details: 'No available positions for move',
@@ -442,45 +448,37 @@ export const gameRoutes: Record<string, ServerRoute> = {
                       });
                   }
 
-                  await sendLogToTelegram('✅ Доступные позиции для хода', { availablePositions });
-
-                  // Проверяем, что все карты восстановлены правильно
                   if (!game.aiHand || game.aiHand.length === 0) {
-                      await sendLogToTelegram('❌ Рука AI пуста после восстановления');
+                      await sendLogToTelegram('❌ Рука AI пуста', gameStateBeforeMove);
                       return errorHandler({
                           h,
-                          details: 'AI hand is empty after restoration',
-                          error: 'Game state restoration failed',
-                          code: 500
+                          details: 'AI has no cards',
+                          error: 'Game state error',
+                          code: 400
                       });
                   }
 
-                  if (game.aiHand.some((card: Card | null) => !card)) {
-                      await sendLogToTelegram('❌ В руке AI есть null карты', {
-                          aiHand: game.aiHand.map((c: Card | null) => c?.id || null)
-                      });
-                      // Попробуем восстановить руку AI из оригинальных карт
-                      if (game.originalAiCards && game.originalAiCards.length > 0) {
-                          game.aiHand = game.originalAiCards
-                              .filter((card: Card) => !game.board?.some((boardCard: Card | null) => boardCard?.id === card?.id))
-                              .map((card: Card) => card.clone());
-                          await sendLogToTelegram('🔄 Восстановили руку AI из оригинальных карт', {
-                              newAiHand: game.aiHand.map((c: Card) => c?.id)
-                          });
-                      }
-                  }
+                  const result = game.makeAIMove();
 
-                  // Восстанавливаем остальное состояние
-                  game.currentTurn = savedState.currentTurn;
-                  game.playerScore = savedState.playerScore;
-                  game.aiScore = savedState.aiScore;
-                  game.gameStatus = savedState.gameStatus;
-                  game.winner = savedState.winner;
-                  game.suddenDeathRound = savedState.suddenDeathRound || 0;
-                  game.boardElements = savedState.boardElements;
-                  game.cardExchange = savedState.cardExchange;
+                  // Логируем результат хода
+                  await sendLogToTelegram('✅ Ход AI выполнен', {
+                      moveResult: result,
+                      newBoardState: game.board?.map((c: Card | null) => c?.id),
+                      remainingAiCards: game.aiHand?.map((c: Card) => c?.id)
+                  });
 
-                  gameStates.set(gameId, game);
+                  // Обновляем состояние в базе данных
+                  await createActiveGame(
+                      game.settings.userId,
+                      gameId,
+                      game.getState()
+                  );
+
+                  return {
+                      status: 'move completed',
+                      gameState: game.getState(),
+                      moveResult: result
+                  };
               }
 
               if (game.currentTurn !== 'ai') {
