@@ -222,7 +222,7 @@ export const gameRoutes: Record<string, ServerRoute> = {
   //
   // Выполнение хода игрока
   playerMove: {
-      method: 'POST',
+      method: 'POST' as const,
       path: '/api/game/{gameId}/player-move',
       handler: async (request, h) => {
           const { gameId } = request.params;
@@ -290,7 +290,7 @@ export const gameRoutes: Record<string, ServerRoute> = {
   //
   // Выполнение хода AI
   aiMove: {
-      method: 'GET',
+      method: 'GET' as const,
       path: '/api/game/{gameId}/ai-move',
       handler: async (request, h) => {
           const { gameId } = request.params;
@@ -392,7 +392,7 @@ export const gameRoutes: Record<string, ServerRoute> = {
   //
   // Получение доступных карт AI для обмена
   getAvailableCards: {
-      method: 'GET',
+      method: 'GET' as const,
       path: '/api/game/{gameId}/available-cards',
       handler: (request, h) => {
           const { gameId } = request.params;
@@ -428,7 +428,7 @@ export const gameRoutes: Record<string, ServerRoute> = {
 
   // Выполнение обмена картами
   exchangeCard: {
-      method: 'POST',
+      method: 'POST' as const,
       path: '/api/game/{gameId}/exchange-card',
       handler: async (request, h) => {
         console.log('📌: Производим обмен картами');
@@ -460,6 +460,15 @@ export const gameRoutes: Record<string, ServerRoute> = {
               game.originalPlayerCards = restoreCards(savedState.originalPlayerCards);
               game.originalAiCards = restoreCards(savedState.originalAiCards);
 
+              // Проверяем восстановление карт
+              console.log('🔍 Проверка восстановленных карт:', {
+                board: game.board?.length,
+                playerHand: game.playerHand?.length,
+                aiHand: game.aiHand?.length,
+                originalPlayerCards: game.originalPlayerCards?.length,
+                originalAiCards: game.originalAiCards?.length
+              });
+
               // Восстанавливаем остальное состояние
               game.currentTurn = savedState.currentTurn;
               game.playerScore = savedState.playerScore;
@@ -484,6 +493,16 @@ export const gameRoutes: Record<string, ServerRoute> = {
           }
 
           if (game.cardExchange) {
+              // Проверяем наличие карты в существующем обмене
+              if (!game.cardExchange.takenCard) {
+                  return errorHandler({
+                      h,
+                      details: 'Карта обмена отсутствует в сохраненном состоянии',
+                      error: 'Ошибка состояния обмена',
+                      code: 500
+                  });
+              }
+
               // Если обмен уже был выполнен, возвращаем результат последнего обмена
               return {
                   status: 'success',
@@ -520,11 +539,13 @@ export const gameRoutes: Record<string, ServerRoute> = {
                       });
                   }
 
+                  console.log('🔍 Ищем карту:', cardId, 'среди карт AI:', game.originalAiCards.map(c => c?.id));
                   const selectedCard = game.originalAiCards.find((card: Card | null) => card && card.id === cardId);
+                  
                   if (!selectedCard) {
                       return errorHandler({
                           h,
-                          details: 'Выбранная карта недоступна в руке противника',
+                          details: `Выбранная карта (${cardId}) недоступна в руке противника`,
                           error: 'Неверный ID карты',
                           code: 400
                       });
@@ -541,12 +562,31 @@ export const gameRoutes: Record<string, ServerRoute> = {
                       });
                   }
 
+                  const clonedCard = selectedCard.clone();
+                  if (!clonedCard) {
+                      return errorHandler({
+                          h,
+                          details: 'Не удалось клонировать карту',
+                          error: 'Ошибка клонирования карты',
+                          code: 500
+                      });
+                  }
+
                   exchangeResult = {
                       type: 'player_win',
-                      takenCard: selectedCard.clone(),
+                      takenCard: clonedCard,
                       message: `Вы забрали карту ${selectedCard.name}!`
                   };
               } else {
+                  if (!game.getCardExchange || typeof game.getCardExchange !== 'function') {
+                      return errorHandler({
+                          h,
+                          details: 'Метод обмена картами недоступен',
+                          error: 'Ошибка состояния игры',
+                          code: 500
+                      });
+                  }
+
                   exchangeResult = game.getCardExchange();
                   // Проверяем результат обмена
                   if (!exchangeResult || !exchangeResult.takenCard) {
@@ -582,8 +622,8 @@ export const gameRoutes: Record<string, ServerRoute> = {
                       game.settings.userId,
                       isWin,
                       isDraw,
-                      wonCards as any,
-                      lostCards as any
+                      wonCards as any[],
+                      lostCards as any[]
                   );
 
                   // Обновляем карты
@@ -617,10 +657,10 @@ export const gameRoutes: Record<string, ServerRoute> = {
                   }
               };
           } catch (error) {
-              console.error('Error updating game data:', error);
+              console.error('Error in card exchange:', error);
               return errorHandler({
                   h,
-                  details: 'Ошибка при обновлении данных игры',
+                  details: 'Ошибка при обмене картами',
                   error,
                   code: 500
               });
@@ -630,7 +670,7 @@ export const gameRoutes: Record<string, ServerRoute> = {
 
   // Обновление статистики игры
   updateGameStats: {
-      method: 'POST',
+      method: 'POST' as const,
       path: '/api/game/{gameId}/stats',
       handler: async (request, h) => {
           const { gameId } = request.params;
@@ -681,7 +721,7 @@ export const gameRoutes: Record<string, ServerRoute> = {
 
   // Удаление игры
   deleteGame: {
-      method: 'DELETE',
+      method: 'DELETE' as const,
       path: '/api/game/{gameId}',
       handler: async (request, h) => {
           const { gameId } = request.params;

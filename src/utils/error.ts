@@ -28,9 +28,14 @@ ${stack ? `\n📚 Стек:\n${stack}` : ''}`;
   bot.sendMessage(ADMIN_CHAT_ID, errorMessage)
     .catch(err => console.error('Failed to send error to Telegram:', err));
 
-  return h.response({
-    error: details || 'Unknown error',
-    details: error instanceof Error ? error.message : 'Unknown error',
-    stack,
-  }).code(code);
+  // Формируем ответ для фронтенда
+  const errorResponse = {
+    status: 'error',
+    code,
+    message: details || 'Произошла неизвестная ошибка',
+    error: error instanceof Error ? error.message : String(error),
+    ...(process.env.NODE_ENV === 'development' && { stack }),
+  };
+
+  return h.response(errorResponse).code(code);
 }
