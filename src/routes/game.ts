@@ -635,31 +635,52 @@ export const gameRoutes: Record<string, ServerRoute> = {
           game.board = restoreCards(savedState.board);
           game.playerHand = restoreCards(savedState.playerHand);
           game.aiHand = restoreCards(savedState.aiHand);
-          game.originalPlayerCards = restoreCards(savedState.originalPlayerCards);
-          game.originalAiCards = restoreCards(savedState.originalAiCards);
+
+          // Особое внимание к восстановлению оригинальных карт
+          if (savedState.originalPlayerCards && Array.isArray(savedState.originalPlayerCards)) {
+              game.originalPlayerCards = restoreCards(savedState.originalPlayerCards);
+          } else {
+              console.log('⚠️ originalPlayerCards не найдены, копируем из playerHand');
+              game.originalPlayerCards = game.playerHand.map(card => card.clone());
+          }
+
+          if (savedState.originalAiCards && Array.isArray(savedState.originalAiCards)) {
+              game.originalAiCards = restoreCards(savedState.originalAiCards);
+              await sendLogToTelegram('✅ Восстановлены оригинальные карты AI', {
+                  count: game.originalAiCards.length,
+                  cards: game.originalAiCards.map(c => ({id: c.id, name: c.name}))
+              });
+          } else {
+              console.log('⚠️ originalAiCards не найдены, копируем из aiHand');
+              game.originalAiCards = game.aiHand.map(card => card.clone());
+              await sendLogToTelegram('⚠️ Использованы карты из текущей руки AI как оригинальные', {
+                  count: game.originalAiCards.length,
+                  cards: game.originalAiCards.map(c => ({id: c.id, name: c.name}))
+              });
+          }
 
           // Проверяем восстановление карт
           const cardsState = {
-            board: {
-              length: game.board?.length,
-              cards: game.board?.map((c: Card | null) => c?.id)
-            },
-            playerHand: {
-              length: game.playerHand?.length,
-              cards: game.playerHand?.map((c: Card | null) => c?.id)
-            },
-            aiHand: {
-              length: game.aiHand?.length,
-              cards: game.aiHand?.map((c: Card | null) => c?.id)
-            },
-            originalPlayerCards: {
-              length: game.originalPlayerCards?.length,
-              cards: game.originalPlayerCards?.map((c: Card | null) => c?.id)
-            },
-            originalAiCards: {
-              length: game.originalAiCards?.length,
-              cards: game.originalAiCards?.map((c: Card | null) => c?.id)
-            }
+              board: {
+                  length: game.board?.length,
+                  cards: game.board?.map((c: Card | null) => c?.id)
+              },
+              playerHand: {
+                  length: game.playerHand?.length,
+                  cards: game.playerHand?.map((c: Card | null) => c?.id)
+              },
+              aiHand: {
+                  length: game.aiHand?.length,
+                  cards: game.aiHand?.map((c: Card | null) => c?.id)
+              },
+              originalPlayerCards: {
+                  length: game.originalPlayerCards?.length,
+                  cards: game.originalPlayerCards?.map((c: Card | null) => c?.id)
+              },
+              originalAiCards: {
+                  length: game.originalAiCards?.length,
+                  cards: game.originalAiCards?.map((c: Card | null) => c?.id)
+              }
           };
           
           console.log('🔍 Детальная проверка восстановленных карт:', cardsState);
