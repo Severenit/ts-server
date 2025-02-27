@@ -265,11 +265,35 @@ export const gameRoutes: Record<string, ServerRoute> = {
               const result = game.makeMove(cardIndex, position);
 
               // Обновляем состояние в базе данных
-              await createActiveGame(
-                  game.settings.userId,
-                  gameId,
-                  game.getState()
-              );
+              try {
+                  const gameState = game.getState();
+                  console.log('📝 Attempting to update game state:', {
+                      userId: game.settings.userId,
+                      gameId,
+                      stateSize: JSON.stringify(gameState).length
+                  });
+
+                  await createActiveGame(
+                      game.settings.userId,
+                      gameId,
+                      gameState
+                  );
+
+                  console.log('✅ Game state updated successfully');
+              } catch (updateError) {
+                  console.error('❌ Error updating game state:', {
+                      error: updateError,
+                      errorMessage: updateError instanceof Error ? updateError.message : 'Unknown error',
+                      stack: updateError instanceof Error ? updateError.stack : undefined
+                  });
+                  
+                  return errorHandler({
+                      h,
+                      details: 'Failed to update game state',
+                      error: updateError,
+                      code: 500
+                  });
+              }
 
               return {
                   status: 'move completed',
@@ -277,13 +301,19 @@ export const gameRoutes: Record<string, ServerRoute> = {
                   moveResult: result
               };
           } catch (error) {
-              console.error('❌ Error in player move:', error);
-            return errorHandler({
-              h,
-              details: (error as Error).message,
-              error: 'Error in player move',
-              code: 400,
-            });
+              console.error('❌ Error in player move:', {
+                  error,
+                  errorMessage: error instanceof Error ? error.message : 'Unknown error',
+                  stack: error instanceof Error ? error.stack : undefined
+              });
+              
+              return errorHandler({
+                  h,
+                  details: error instanceof Error ? error.message : 'Error in player move',
+                  error: 'Error in player move',
+                  code: 400,
+                  stack: error instanceof Error ? error.stack : undefined
+              });
           }
       }
   },
