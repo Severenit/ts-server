@@ -142,7 +142,7 @@ export async function deleteActiveGame(gameId: string) {
  * @param {string[]} lostCards - ID потерянных карт
  * @returns {Promise<Object>} Обновленная статистика
  */
-export async function updateUserStats(statsId: string, isWin: boolean, isDraw: boolean, wonCards = [], lostCards = []) {
+export async function updateUserStats(statsId: string, isWin: boolean, isDraw: boolean, wonCards: string[] = [], lostCards: string[] = []) {
   try {
     console.log('🎮 Updating user stats...');
     const stats = await client.request<{ userStats: any }>(GET_USER_STATS, { statsId });

@@ -540,7 +540,7 @@ export const gameRoutes: Record<string, ServerRoute> = {
                   }
 
                   console.log('🔍 Ищем карту:', cardId, 'среди карт AI:', game.originalAiCards.map((c: Card | null) => c?.id));
-                  const selectedCard = game.originalAiCards.find((card: Card | null) => card && card.id === cardId);
+                  const selectedCard = game.originalAiCards.filter((card: Card | null): card is Card => card !== null).find((card: Card) => card.id === cardId);
                   
                   if (!selectedCard) {
                       return errorHandler({
@@ -618,12 +618,12 @@ export const gameRoutes: Record<string, ServerRoute> = {
                   const lostCards: string[] = !isWin && !isDraw ? [exchangeResult.takenCard.id] : [];
 
                   // Обновляем статистику
-                  const stats = await updateUserStats(
+                  await updateUserStats(
                       game.settings.userId,
                       isWin,
                       isDraw,
-                      wonCards as any[],
-                      lostCards as any[]
+                      wonCards,
+                      lostCards
                   );
 
                   // Обновляем карты
@@ -687,12 +687,13 @@ export const gameRoutes: Record<string, ServerRoute> = {
 
           try {
               // Обновляем статистику
+              // @ts-ignore
               const stats = await updateUserStats(
                   statsId,
                   isWin,
                   isDraw,
-                  wonCards as any,
-                  lostCards as any
+                  wonCards,
+                  lostCards
               );
 
               // Удаляем игру из базы данных
