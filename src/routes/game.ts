@@ -369,6 +369,41 @@ export const gameRoutes: Record<string, ServerRoute> = {
                   gameStates.set(gameId, game);
               }
 
+              // Проверяем состояние перед ходом игрока
+              const gameStateBeforeMove = {
+                  board: {
+                      isArray: Array.isArray(game.board),
+                      length: game.board.length,
+                      content: game.board,
+                      nullPositions: game.board
+                          .map((cell: Card | null, index: number) => ({ pos: index, isEmpty: cell === null }))
+                          .filter((pos: { pos: number; isEmpty: boolean }) => pos.isEmpty)
+                          .map((pos: { pos: number }) => pos.pos)
+                  },
+                  playerHand: {
+                      length: game.playerHand?.length,
+                      cards: game.playerHand?.map((c: Card | null) => c?.id)
+                  },
+                  currentTurn: game.currentTurn,
+                  gameStatus: game.gameStatus
+              };
+
+              await sendLogToTelegram('🎮 Состояние игры перед ходом игрока', gameStateBeforeMove);
+
+              // Проверяем, чей сейчас ход
+              if (game.currentTurn !== 'player') {
+                  await sendLogToTelegram('❌ Попытка хода игрока, когда currentTurn !== player', {
+                      currentTurn: game.currentTurn,
+                      gameStatus: game.gameStatus
+                  });
+                  return h.response({
+                      error: 'Not player\'s turn',
+                      details: {
+                          currentTurn: game.currentTurn
+                      }
+                  }).code(400);
+              }
+
               const result = game.makeMove(cardIndex, position);
 
               // Обновляем состояние в базе данных
