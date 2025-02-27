@@ -46,7 +46,7 @@ export async function getOrCreatePlayer(telegramData: GetOrCreatePlayerProps) {
 
     const userData = {
       telegram_id: telegramData.id.toString(),
-      username: telegramData.username || 'anonymous',
+      username: telegramData.username || telegramData.id.toString(),
       telegram_hash: telegramData.hash || defaultHash,
       first_name: telegramData.first_name || '',
       last_name: telegramData.last_name || '',

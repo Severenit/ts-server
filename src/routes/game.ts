@@ -27,19 +27,27 @@ import { addCardToPlayer, deletePlayerCard } from '../keystone-api/user.js';
 // Вспомогательная функция для восстановления объектов карт
 function restoreCards(cards: PlayerCard[]) {
   if (!cards) return [];
+  console.log('🔄 Restoring cards:', cards.map(c => c?.id));
   const deck = Card.createDeck();
+  console.log('🎴 Available deck cards:', deck.map(c => c.id));
   return cards.map(cardData => {
-    if (!cardData) return null;
+    if (!cardData) {
+      console.log('⚠️ Card data is null');
+      return null;
+    }
 
     const card = deck.find(c => c.id === cardData.id);
-
-    if (!card) return null;
+    if (!card) {
+      console.log(`❌ Card ${cardData.id} not found in deck`);
+      return null;
+    }
 
     const restoredCard = card.clone();
     restoredCard.owner = cardData.owner;
     // @ts-expect-error
     restoredCard.position = cardData.position;
 
+    console.log(`✅ Successfully restored card ${cardData.id}`);
     return restoredCard;
   });
 }
@@ -569,8 +577,17 @@ export const gameRoutes: Record<string, ServerRoute> = {
                       });
                   }
 
-                  console.log('🔍 Ищем карту:', cardId, 'среди карт AI:', game.originalAiCards.map((c: Card | null) => c?.id));
-                  const selectedCard = game.originalAiCards.filter((card: Card | null): card is Card => card !== null).find((card: Card) => card.id === cardId);
+                  console.log('🔍 Original AI cards before restoration:', game.originalAiCards);
+                  console.log('🔍 Searching for card:', cardId);
+                  const selectedCard = game.originalAiCards.filter((card: Card | null): card is Card => {
+                      const isValid = card !== null;
+                      console.log(`Card ${card?.id}: ${isValid ? 'valid' : 'invalid'}`);
+                      return isValid;
+                  }).find((card: Card) => {
+                      const isMatch = card.id === cardId;
+                      console.log(`Comparing card ${card.id} with ${cardId}: ${isMatch}`);
+                      return isMatch;
+                  });
                   
                   if (!selectedCard) {
                       return errorHandler({
