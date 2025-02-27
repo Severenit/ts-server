@@ -233,7 +233,7 @@ export const gameRoutes: Record<string, ServerRoute> = {
           if (Array.isArray(savedState.board) && savedState.board.length === 9) {
               const restoredBoard = restoreCards(savedState.board);
               // Копируем только валидные карты, сохраняя null для пустых позиций
-              savedState.board.forEach((card, index) => {
+              savedState.board.forEach((card: Card | null, index: number) => {
                   if (card) {
                       game.board[index] = restoredBoard.find(c => c.id === card.id) || null;
                   }
@@ -243,7 +243,7 @@ export const gameRoutes: Record<string, ServerRoute> = {
           await sendLogToTelegram('🎮 Состояние доски после инициализации', {
               board: game.board,
               length: game.board.length,
-              nullCount: game.board.filter(cell => cell === null).length
+              nullCount: game.board.filter((cell: Card | null) => cell === null).length
           });
 
           // Восстанавливаем карты
@@ -525,12 +525,12 @@ export const gameRoutes: Record<string, ServerRoute> = {
               try {
                   const result = game.makeAIMove();
 
-                  // Логируем результат хода
-                  await sendLogToTelegram('✅ Ход AI выполнен', {
-                      moveResult: result,
-                      newBoardState: game.board?.map((c: Card | null) => c?.id),
-                      remainingAiCards: game.aiHand?.map((c: Card | null) => c?.id)
-                  });
+                  // // Логируем результат хода
+                  // await sendLogToTelegram('✅ Ход AI выполнен', {
+                  //     moveResult: result,
+                  //     newBoardState: game.board?.map((c: Card | null) => c?.id),
+                  //     remainingAiCards: game.aiHand?.map((c: Card | null) => c?.id)
+                  // });
 
                   // Обновляем состояние в базе данных
                   await createActiveGame(
@@ -641,21 +641,21 @@ export const gameRoutes: Record<string, ServerRoute> = {
               game.originalPlayerCards = restoreCards(savedState.originalPlayerCards);
           } else {
               console.log('⚠️ originalPlayerCards не найдены, копируем из playerHand');
-              game.originalPlayerCards = game.playerHand.map(card => card.clone());
+              game.originalPlayerCards = game.playerHand.map((card: Card) => card.clone());
           }
 
           if (savedState.originalAiCards && Array.isArray(savedState.originalAiCards)) {
               game.originalAiCards = restoreCards(savedState.originalAiCards);
               await sendLogToTelegram('✅ Восстановлены оригинальные карты AI', {
                   count: game.originalAiCards.length,
-                  cards: game.originalAiCards.map(c => ({id: c.id, name: c.name}))
+                  cards: game.originalAiCards.map((c: Card) => ({id: c.id, name: c.name}))
               });
           } else {
               console.log('⚠️ originalAiCards не найдены, копируем из aiHand');
-              game.originalAiCards = game.aiHand.map(card => card.clone());
+              game.originalAiCards = game.aiHand.map((card: Card) => card.clone());
               await sendLogToTelegram('⚠️ Использованы карты из текущей руки AI как оригинальные', {
                   count: game.originalAiCards.length,
-                  cards: game.originalAiCards.map(c => ({id: c.id, name: c.name}))
+                  cards: game.originalAiCards.map((c: Card) => ({id: c.id, name: c.name}))
               });
           }
 

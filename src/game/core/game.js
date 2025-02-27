@@ -352,7 +352,9 @@ export class Game {
             playerScore: this.playerScore,
             aiScore: this.aiScore,
             gameStatus: this.gameStatus,
-            winner: this.winner
+            winner: this.winner,
+            originalPlayerCards: this.originalPlayerCards.map(card => card.toClientObject(false)),
+            originalAiCards: this.originalAiCards.map(card => card.toClientObject(false))
         };
 
         // Добавляем информацию о внезапной смерти
@@ -366,11 +368,11 @@ export class Game {
         // Добавляем информацию об окончании игры
         if (this.gameStatus === 'finished') {
             // Собираем оригинальные карты из карт на поле
-            const originalPlayerCards = this.board
+            const boardPlayerCards = this.board
                 .filter(card => card && card.originalOwner === 'player')
                 .map(card => card.toClientObject(false));
 
-            const originalAiCards = this.board
+            const boardAiCards = this.board
                 .filter(card => card && card.originalOwner === 'ai')
                 .map(card => card.toClientObject(false));
 
@@ -386,8 +388,8 @@ export class Game {
                 })),
                 totalRounds: this.suddenDeathRound + 1,
                 originalCards: {
-                    player: originalPlayerCards,
-                    ai: originalAiCards
+                    player: boardPlayerCards,
+                    ai: boardAiCards
                 }
             };
 

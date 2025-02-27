@@ -58,6 +58,8 @@ export interface GameState {
   aiScore: number;
   gameStatus: 'playing' | 'finished' | 'sudden_death';
   winner: 'player' | 'ai' | 'draw' | null;
+  originalPlayerCards: Array<PlayerCard>;
+  originalAiCards: Array<AiCard>;
 }
 
 export interface ActiveGame {
