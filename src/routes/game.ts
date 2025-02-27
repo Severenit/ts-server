@@ -250,10 +250,14 @@ export const gameRoutes: Record<string, ServerRoute> = {
           game.originalPlayerCards = restoreCards(savedState.originalPlayerCards);
           game.originalAiCards = restoreCards(savedState.originalAiCards);
 
-          // Восстанавливаем остальное состояние
-          game.currentTurn = savedState.currentTurn;
-          game.playerScore = savedState.playerScore;
-          game.aiScore = savedState.aiScore;
+          // Восстанавливаем остальное состояние с значениями по умолчанию
+          await sendLogToTelegram('🔄 Восстанавливаем currentTurn', {
+              savedTurn: savedState.currentTurn,
+              defaultTurn: 'player'
+          });
+          game.currentTurn = savedState.currentTurn || 'player';
+          game.playerScore = savedState.playerScore || 5;
+          game.aiScore = savedState.aiScore || 5;
           game.gameStatus = savedState.gameStatus;
           game.winner = savedState.winner;
           game.suddenDeathRound = savedState.suddenDeathRound || 0;
@@ -330,6 +334,10 @@ export const gameRoutes: Record<string, ServerRoute> = {
                   }
 
                   // Восстанавливаем остальное состояние с значениями по умолчанию
+                  await sendLogToTelegram('🔄 Восстанавливаем currentTurn', {
+                      savedTurn: savedState.currentTurn,
+                      defaultTurn: 'player'
+                  });
                   game.currentTurn = savedState.currentTurn || 'player';
                   game.playerScore = savedState.playerScore || 5;
                   game.aiScore = savedState.aiScore || 5;
@@ -526,6 +534,10 @@ export const gameRoutes: Record<string, ServerRoute> = {
                   }
 
                   // Восстанавливаем остальное состояние
+                  await sendLogToTelegram('🔄 Восстанавливаем currentTurn', {
+                      savedTurn: savedState.currentTurn,
+                      defaultTurn: 'player'
+                  });
                   game.currentTurn = savedState.currentTurn || 'player';
                   game.playerScore = savedState.playerScore || 5;
                   game.aiScore = savedState.aiScore || 5;
