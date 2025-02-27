@@ -539,7 +539,7 @@ export const gameRoutes: Record<string, ServerRoute> = {
                       });
                   }
 
-                  console.log('🔍 Ищем карту:', cardId, 'среди карт AI:', game.originalAiCards.map(c => c?.id));
+                  console.log('🔍 Ищем карту:', cardId, 'среди карт AI:', game.originalAiCards.map((c: Card | null) => c?.id));
                   const selectedCard = game.originalAiCards.find((card: Card | null) => card && card.id === cardId);
                   
                   if (!selectedCard) {
