@@ -8,7 +8,7 @@ import {
   getActiveGameByGameId, 
   updateUserStats 
 } from '../keystone-api/game.js';
-import { errorHandler } from '../utils/error.js';
+import { errorHandler, sendLogToTelegram } from '../utils/error.js';
 import { GameState, PlayerCard } from '../types/game.js';
 import { Card } from '../game/core/card.js';
 import { addCardToPlayer, deletePlayerCard } from '../keystone-api/user.js';
@@ -26,30 +26,64 @@ import { addCardToPlayer, deletePlayerCard } from '../keystone-api/user.js';
 //
 // Вспомогательная функция для восстановления объектов карт
 function restoreCards(cards: PlayerCard[]) {
-  if (!cards) return [];
-  console.log('🔄 Restoring cards:', cards.map(c => c?.id));
+  if (!cards) {
+    const message = '⚠️ Cards array is null or undefined';
+    console.log(message);
+    sendLogToTelegram(message);
+    return [];
+  }
+  
+  console.log('🔄 Restoring cards:', cards.map((c: PlayerCard) => c?.id));
+  sendLogToTelegram('🔄 Восстанавливаем карты', { cards: cards.map(c => c?.id) });
+  
   const deck = Card.createDeck();
-  console.log('🎴 Available deck cards:', deck.map(c => c.id));
+  console.log('🎴 Available deck cards:', deck.map((c: Card) => c.id));
+  
   return cards.map(cardData => {
     if (!cardData) {
-      console.log('⚠️ Card data is null');
+      const message = '⚠️ Card data is null';
+      console.log(message);
+      sendLogToTelegram(message);
       return null;
     }
 
-    const card = deck.find(c => c.id === cardData.id);
+    if (!cardData.id) {
+      const message = '⚠️ Card data has no ID';
+      console.log(message, cardData);
+      sendLogToTelegram(message, cardData);
+      return null;
+    }
+
+    const card = deck.find((c: Card) => c.id === cardData.id);
     if (!card) {
-      console.log(`❌ Card ${cardData.id} not found in deck`);
+      const message = `❌ Card ${cardData.id} not found in deck`;
+      console.log(message);
+      sendLogToTelegram(message);
       return null;
     }
 
-    const restoredCard = card.clone();
-    restoredCard.owner = cardData.owner;
-    // @ts-expect-error
-    restoredCard.position = cardData.position;
+    try {
+      const restoredCard = card.clone();
+      if (!restoredCard) {
+        const message = `❌ Failed to clone card ${card.id}`;
+        console.log(message);
+        sendLogToTelegram(message);
+        return null;
+      }
 
-    console.log(`✅ Successfully restored card ${cardData.id}`);
-    return restoredCard;
-  });
+      restoredCard.owner = cardData.owner;
+      // @ts-expect-error
+      restoredCard.position = cardData.position;
+
+      console.log(`✅ Successfully restored card ${cardData.id}`);
+      return restoredCard;
+    } catch (error) {
+      const message = `❌ Error restoring card ${cardData.id}`;
+      console.error(message, error);
+      sendLogToTelegram(message, { error, cardData });
+      return null;
+    }
+  }).filter((card: Card | null): card is Card => card !== null);
 }
 
 // Map для хранения состояний игр
@@ -470,260 +504,306 @@ export const gameRoutes: Record<string, ServerRoute> = {
       path: '/api/game/{gameId}/exchange-card',
       handler: async (request, h) => {
         console.log('📌: Производим обмен картами');
-          const { gameId } = request.params;
-          const { cardId } = request.payload as ExchangeCardPayload || {};
-          let game = gameStates.get(gameId);
+        await sendLogToTelegram('📌 Начинаем процесс обмена картами');
+        
+        const { gameId } = request.params;
+        const { cardId } = request.payload as ExchangeCardPayload || {};
+        let game = gameStates.get(gameId);
 
-          if (!game) {
-              // Пытаемся восстановить игру из базы данных
-              const activeGame = await getActiveGameByGameId(gameId);
-              if (!activeGame) {
-                  return h.response({
-                      error: 'Кажется мы потеряли данные об игре :(',
-                      details: {
-                          gameId,
-                          availableGames: Array.from(gameStates.keys())
-                      }
-                  }).code(404);
-              }
-
-              // Восстанавливаем состояние игры
-              const savedState = activeGame.gameState;
-              game = new Game(savedState.settings || {}, savedState.rules || {});
-
-              // Восстанавливаем карты
-              game.board = restoreCards(savedState.board);
-              game.playerHand = restoreCards(savedState.playerHand);
-              game.aiHand = restoreCards(savedState.aiHand);
-              game.originalPlayerCards = restoreCards(savedState.originalPlayerCards);
-              game.originalAiCards = restoreCards(savedState.originalAiCards);
-
-              // Проверяем восстановление карт
-              console.log('🔍 Проверка восстановленных карт:', {
-                board: game.board?.length,
-                playerHand: game.playerHand?.length,
-                aiHand: game.aiHand?.length,
-                originalPlayerCards: game.originalPlayerCards?.length,
-                originalAiCards: game.originalAiCards?.length
-              });
-
-              // Восстанавливаем остальное состояние
-              game.currentTurn = savedState.currentTurn;
-              game.playerScore = savedState.playerScore;
-              game.aiScore = savedState.aiScore;
-              game.gameStatus = savedState.gameStatus;
-              game.winner = savedState.winner;
-              game.suddenDeathRound = savedState.suddenDeathRound || 0;
-              game.boardElements = savedState.boardElements;
-              game.cardExchange = savedState.cardExchange;
-
-              // Сохраняем восстановленное состояние в память
-              gameStates.set(gameId, game);
+        if (!game) {
+          await sendLogToTelegram('🔄 Игра не найдена в памяти, пытаемся восстановить из БД', { gameId });
+          // Пытаемся восстановить игру из базы данных
+          const activeGame = await getActiveGameByGameId(gameId);
+          if (!activeGame) {
+              return h.response({
+                  error: 'Кажется мы потеряли данные об игре :(',
+                  details: {
+                      gameId,
+                      availableGames: Array.from(gameStates.keys())
+                  }
+              }).code(404);
           }
 
-          if (game.gameStatus !== 'finished' || game.winner === 'draw') {
-              return errorHandler({
-                  h,
-                  details: `Обмен картами доступен только после завершения игры с определенным победителем. Статус игры: ${game.gameStatus}, победитель: ${game.winner}`,
-                  error: 'Ошибка обмена картами',
-                  code: 400
-              });
-          }
+          // Восстанавливаем состояние игры
+          const savedState = activeGame.gameState;
+          game = new Game(savedState.settings || {}, savedState.rules || {});
 
-          if (game.cardExchange) {
-              // Проверяем наличие карты в существующем обмене
-              if (!game.cardExchange.takenCard) {
-                  return errorHandler({
-                      h,
-                      details: 'Карта обмена отсутствует в сохраненном состоянии',
-                      error: 'Ошибка состояния обмена',
-                      code: 500
-                  });
-              }
+          // Восстанавливаем карты
+          console.log('🔄 Начинаем восстановление карт');
+          game.board = restoreCards(savedState.board);
+          game.playerHand = restoreCards(savedState.playerHand);
+          game.aiHand = restoreCards(savedState.aiHand);
+          game.originalPlayerCards = restoreCards(savedState.originalPlayerCards);
+          game.originalAiCards = restoreCards(savedState.originalAiCards);
 
-              // Если обмен уже был выполнен, возвращаем результат последнего обмена
-              return {
-                  status: 'success',
-                  exchange: {
-                      type: game.cardExchange.type,
-                      card: game.cardExchange.takenCard.toClientObject(false),
-                      message: game.cardExchange.message,
-                      gameId: gameId,
-                      isRepeated: true
-                  }
-              };
-          }
+          // Проверяем восстановление карт
+          const cardsState = {
+            board: {
+              length: game.board?.length,
+              cards: game.board?.map((c: Card | null) => c?.id)
+            },
+            playerHand: {
+              length: game.playerHand?.length,
+              cards: game.playerHand?.map((c: Card | null) => c?.id)
+            },
+            aiHand: {
+              length: game.aiHand?.length,
+              cards: game.aiHand?.map((c: Card | null) => c?.id)
+            },
+            originalPlayerCards: {
+              length: game.originalPlayerCards?.length,
+              cards: game.originalPlayerCards?.map((c: Card | null) => c?.id)
+            },
+            originalAiCards: {
+              length: game.originalAiCards?.length,
+              cards: game.originalAiCards?.map((c: Card | null) => c?.id)
+            }
+          };
+          
+          console.log('🔍 Детальная проверка восстановленных карт:', cardsState);
+          await sendLogToTelegram('🔍 Состояние карт после восстановления', cardsState);
 
-          try {
-              let exchangeResult;
+          // Восстанавливаем остальное состояние
+          game.currentTurn = savedState.currentTurn;
+          game.playerScore = savedState.playerScore;
+          game.aiScore = savedState.aiScore;
+          game.gameStatus = savedState.gameStatus;
+          game.winner = savedState.winner;
+          game.suddenDeathRound = savedState.suddenDeathRound || 0;
+          game.boardElements = savedState.boardElements;
+          game.cardExchange = savedState.cardExchange;
 
-              if (game.winner === 'player') {
-                  if (!cardId) {
-                      return errorHandler({
-                          h,
-                          details: 'Пожалуйста, укажите какую карту вы хотите забрать у противника',
-                          error: 'Не указан ID карты для обмена',
-                          code: 400
-                      });
-                  }
+          // Сохраняем восстановленное состояние в память
+          gameStates.set(gameId, game);
+        }
 
-                  // Проверяем наличие карт AI
-                  if (!game.originalAiCards || !Array.isArray(game.originalAiCards)) {
-                      return errorHandler({
-                          h,
-                          details: 'Карты противника недоступны',
-                          error: 'Ошибка состояния игры',
-                          code: 500
-                      });
-                  }
+        if (game.gameStatus !== 'finished' || game.winner === 'draw') {
+            return errorHandler({
+                h,
+                details: `Обмен картами доступен только после завершения игры с определенным победителем. Статус игры: ${game.gameStatus}, победитель: ${game.winner}`,
+                error: 'Ошибка обмена картами',
+                code: 400
+            });
+        }
 
-                  console.log('🔍 Original AI cards before restoration:', game.originalAiCards);
-                  console.log('🔍 Searching for card:', cardId);
+        if (game.cardExchange) {
+            // Проверяем наличие карты в существующем обмене
+            if (!game.cardExchange.takenCard) {
+                return errorHandler({
+                    h,
+                    details: 'Карта обмена отсутствует в сохраненном состоянии',
+                    error: 'Ошибка состояния обмена',
+                    code: 500
+                });
+            }
 
-                  // Создаем новую колоду для сравнения
-                  const deck = Card.createDeck();
-                  const deckCard = deck.find(c => c.id === cardId);
+            // Если обмен уже был выполнен, возвращаем результат последнего обмена
+            return {
+                status: 'success',
+                exchange: {
+                    type: game.cardExchange.type,
+                    card: game.cardExchange.takenCard.toClientObject(false),
+                    message: game.cardExchange.message,
+                    gameId: gameId,
+                    isRepeated: true
+                }
+            };
+        }
 
-                  if (!deckCard) {
-                      return errorHandler({
-                          h,
-                          details: `Карта с ID ${cardId} не найдена в колоде`,
-                          error: 'Неверный ID карты',
-                          code: 400
-                      });
-                  }
+        try {
+            let exchangeResult;
 
-                  // Проверяем наличие карты в оригинальных картах AI
-                  const selectedCard = game.originalAiCards.find((card: Card | null) => {
-                      if (!card) {
-                          console.log('⚠️ Found null card in originalAiCards');
-                          return false;
-                      }
-                      const isMatch = card.id === cardId;
-                      console.log(`Comparing card ${card.id} with ${cardId}: ${isMatch}`);
-                      return isMatch;
-                  });
+            if (game.winner === 'player') {
+                await sendLogToTelegram('👤 Победил игрок, проверяем возможность обмена карт', {
+                  requestedCardId: cardId,
+                  availableCards: game.originalAiCards.map((c: Card | null) => ({
+                    id: c?.id,
+                    name: c?.name,
+                    isNull: c === null
+                  }))
+                });
 
-                  if (!selectedCard) {
-                      return errorHandler({
-                          h,
-                          details: `Выбранная карта (${cardId}) недоступна в руке противника`,
-                          error: 'Неверный ID карты',
-                          code: 400
-                      });
-                  }
+                if (!cardId) {
+                    return errorHandler({
+                        h,
+                        details: 'Пожалуйста, укажите какую карту вы хотите забрать у противника',
+                        error: 'Не указан ID карты для обмена',
+                        code: 400
+                    });
+                }
 
-                  // Используем карту из колоды для клонирования
-                  const clonedCard = deckCard.clone();
-                  if (!clonedCard) {
-                      return errorHandler({
-                          h,
-                          details: 'Не удалось клонировать карту',
-                          error: 'Ошибка клонирования карты',
-                          code: 500
-                      });
-                  }
+                // Проверяем наличие карт AI
+                if (!game.originalAiCards || !Array.isArray(game.originalAiCards)) {
+                    console.error('❌ Ошибка originalAiCards:', {
+                        originalAiCards: game.originalAiCards,
+                        isArray: Array.isArray(game.originalAiCards),
+                        type: typeof game.originalAiCards
+                    });
+                    return errorHandler({
+                        h,
+                        details: 'Карты противника недоступны',
+                        error: 'Ошибка состояния игры',
+                        code: 500
+                    });
+                }
 
-                  // Копируем необходимые свойства из выбранной карты
-                  clonedCard.owner = selectedCard.owner;
-                  // @ts-expect-error
-                  clonedCard.position = selectedCard.position;
+                console.log('🔍 Проверка карт AI перед обменом:', {
+                    requestedCardId: cardId,
+                    availableCards: game.originalAiCards.map((c: Card | null) => ({
+                        id: c?.id,
+                        name: c?.name,
+                        isNull: c === null
+                    }))
+                });
 
-                  exchangeResult = {
-                      type: 'player_win',
-                      takenCard: clonedCard,
-                      message: `Вы забрали карту ${selectedCard.name}!`
-                  };
-              } else {
-                  if (!game.getCardExchange || typeof game.getCardExchange !== 'function') {
-                      return errorHandler({
-                          h,
-                          details: 'Метод обмена картами недоступен',
-                          error: 'Ошибка состояния игры',
-                          code: 500
-                      });
-                  }
+                // Создаем новую колоду для сравнения
+                const deck = Card.createDeck();
+                const deckCard = deck.find(c => c.id === cardId);
 
-                  exchangeResult = game.getCardExchange();
-                  // Проверяем результат обмена
-                  if (!exchangeResult || !exchangeResult.takenCard) {
-                      return errorHandler({
-                          h,
-                          details: 'Invalid exchange result',
-                          error: 'Failed to perform card exchange',
-                          code: 500
-                      });
-                  }
-              }
+                if (!deckCard) {
+                    console.error('❌ Карта не найдена в колоде:', {
+                        requestedCardId: cardId,
+                        availableCardIds: deck.map(c => c.id)
+                    });
+                    return errorHandler({
+                        h,
+                        details: `Карта с ID ${cardId} не найдена в колоде`,
+                        error: 'Неверный ID карты',
+                        code: 400
+                    });
+                }
 
-              if (!exchangeResult) {
-                  return errorHandler({
-                      h,
-                      details: 'Не удалось выполнить обмен картами',
-                      error: 'Результат обмена не определен',
-                      code: 400
-                  });
-              }
+                // Проверяем наличие карты в оригинальных картах AI
+                const selectedCard = game.originalAiCards.find((card: Card | null) => {
+                    if (!card) {
+                        console.log('⚠️ Found null card in originalAiCards');
+                        return false;
+                    }
+                    const isMatch = card.id === cardId;
+                    console.log(`🔍 Сравниваем карту ${card.id} с запрошенной ${cardId}: ${isMatch}`);
+                    return isMatch;
+                });
 
-              game.cardExchange = exchangeResult;
+                if (!selectedCard) {
+                    return errorHandler({
+                        h,
+                        details: `Выбранная карта (${cardId}) недоступна в руке противника`,
+                        error: 'Неверный ID карты',
+                        code: 400
+                    });
+                }
 
-              try {
-                  // Обновляем карты в базе данных и статистику
-                  const isWin = game.winner === 'player';
-                  const isDraw = game.winner === 'draw';
-                  const wonCards: string[] = isWin ? [exchangeResult.takenCard.id] : [];
-                  const lostCards: string[] = !isWin && !isDraw ? [exchangeResult.takenCard.id] : [];
+                // Используем карту из колоды для клонирования
+                const clonedCard = deckCard.clone();
+                if (!clonedCard) {
+                    return errorHandler({
+                        h,
+                        details: 'Не удалось клонировать карту',
+                        error: 'Ошибка клонирования карты',
+                        code: 500
+                    });
+                }
 
-                  // Обновляем статистику
-                  await updateUserStats(
-                      game.settings.userId,
-                      isWin,
-                      isDraw,
-                      wonCards,
-                      lostCards
-                  );
+                // Копируем необходимые свойства из выбранной карты
+                clonedCard.owner = selectedCard.owner;
+                // @ts-expect-error
+                clonedCard.position = selectedCard.position;
 
-                  // Обновляем карты
-                  if (isWin) {
-                      // Игрок выиграл - добавляем ему карту AI
-                      await addCardToPlayer(game.settings.userId, exchangeResult.takenCard.id);
-                  } else if (!isDraw) {
-                      // AI выиграл - удаляем карту у игрока
-                      await deletePlayerCard(game.settings.userId, exchangeResult.takenCard.id);
-                  }
+                exchangeResult = {
+                    type: 'player_win',
+                    takenCard: clonedCard,
+                    message: `Вы забрали карту ${selectedCard.name}!`
+                };
+            } else {
+                if (!game.getCardExchange || typeof game.getCardExchange !== 'function') {
+                    return errorHandler({
+                        h,
+                        details: 'Метод обмена картами недоступен',
+                        error: 'Ошибка состояния игры',
+                        code: 500
+                    });
+                }
 
-                  // Удаляем игру из базы данных
-                  await deleteActiveGame(gameId);
-              } catch (error) {
-                  console.error('Error updating game data:', error);
-                  return errorHandler({
-                      h,
-                      details: 'Ошибка при обновлении данных игры',
-                      error,
-                      code: 500
-                  });
-              }
+                exchangeResult = game.getCardExchange();
+                // Проверяем результат обмена
+                if (!exchangeResult || !exchangeResult.takenCard) {
+                    return errorHandler({
+                        h,
+                        details: 'Invalid exchange result',
+                        error: 'Failed to perform card exchange',
+                        code: 500
+                    });
+                }
+            }
 
-              return {
-                  status: 'success',
-                  exchange: {
-                      type: exchangeResult.type,
-                      card: exchangeResult.takenCard.toClientObject(false),
-                      message: exchangeResult.message,
-                      gameId: gameId
-                  }
-              };
-          } catch (error) {
-              console.error('Error in card exchange:', error);
-              return errorHandler({
-                  h,
-                  details: 'Ошибка при обмене картами',
-                  error,
-                  code: 500
-              });
-          }
-      }
-  },
+            if (!exchangeResult) {
+                return errorHandler({
+                    h,
+                    details: 'Не удалось выполнить обмен картами',
+                    error: 'Результат обмена не определен',
+                    code: 400
+                });
+            }
+
+            game.cardExchange = exchangeResult;
+
+            try {
+                // Обновляем карты в базе данных и статистику
+                const isWin = game.winner === 'player';
+                const isDraw = game.winner === 'draw';
+                const wonCards: string[] = isWin ? [exchangeResult.takenCard.id] : [];
+                const lostCards: string[] = !isWin && !isDraw ? [exchangeResult.takenCard.id] : [];
+
+                // Обновляем статистику
+                await updateUserStats(
+                    game.settings.userId,
+                    isWin,
+                    isDraw,
+                    wonCards,
+                    lostCards
+                );
+
+                // Обновляем карты
+                if (isWin) {
+                    // Игрок выиграл - добавляем ему карту AI
+                    await addCardToPlayer(game.settings.userId, exchangeResult.takenCard.id);
+                } else if (!isDraw) {
+                    // AI выиграл - удаляем карту у игрока
+                    await deletePlayerCard(game.settings.userId, exchangeResult.takenCard.id);
+                }
+
+                // Удаляем игру из базы данных
+                await deleteActiveGame(gameId);
+            } catch (error) {
+                console.error('Error updating game data:', error);
+                return errorHandler({
+                    h,
+                    details: 'Ошибка при обновлении данных игры',
+                    error,
+                    code: 500
+                });
+            }
+
+            return {
+                status: 'success',
+                exchange: {
+                    type: exchangeResult.type,
+                    card: exchangeResult.takenCard.toClientObject(false),
+                    message: exchangeResult.message,
+                    gameId: gameId
+                }
+            };
+        } catch (error) {
+            console.error('Error in card exchange:', error);
+            return errorHandler({
+                h,
+                details: 'Ошибка при обмене картами',
+                error,
+                code: 500
+            });
+        }
+    }
+},
 
   // Обновление статистики игры
   updateGameStats: {
