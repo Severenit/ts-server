@@ -461,7 +461,19 @@ export const gameRoutes: Record<string, ServerRoute> = {
                       });
                       game.board = Array(9).fill(null);
                   } else {
-                      game.board = savedState.board;
+                      // Восстанавливаем карты на доске
+                      const restoredBoard = restoreCards(savedState.board);
+                      game.board = Array(9).fill(null);
+                      // Копируем только валидные карты, сохраняя null для пустых позиций
+                      savedState.board.forEach((card, index) => {
+                          if (card) {
+                              game.board[index] = restoredBoard.find(c => c.id === card.id) || null;
+                          }
+                      });
+                      
+                      await sendLogToTelegram('✅ Восстановлена доска', {
+                          board: game.board.map(card => card ? { id: card.id, name: card.name } : null)
+                      });
                   }
 
                   // Восстанавливаем карты с проверкой на null
