@@ -371,6 +371,7 @@ export const gameRoutes: Record<string, ServerRoute> = {
               let game = gameStates.get(gameId);
 
               if (!game) {
+                  await sendLogToTelegram('🔄 Восстанавливаем игру из БД', { gameId });
                   // Пытаемся восстановить игру из базы данных
                   const activeGame = await getActiveGameByGameId(gameId);
 
@@ -397,11 +398,48 @@ export const gameRoutes: Record<string, ServerRoute> = {
                       game.originalAiCards = game.aiHand.map((card: Card) => card.clone());
                   }
 
+                  // Проверяем состояние игры после восстановления
+                  const gameState = {
+                      board: {
+                          length: game.board?.length,
+                          cards: game.board?.map(c => c?.id),
+                          nullCount: game.board?.filter(c => !c).length
+                      },
+                      aiHand: {
+                          length: game.aiHand?.length,
+                          cards: game.aiHand?.map(c => c?.id),
+                          nullCount: game.aiHand?.filter(c => !c).length
+                      },
+                      currentTurn: game.currentTurn,
+                      gameStatus: game.gameStatus
+                  };
+
+                  await sendLogToTelegram('🎮 Состояние игры после восстановления', gameState);
+
                   // Проверяем, что все карты восстановлены правильно
-                  if (!game.originalPlayerCards || !game.originalAiCards ||
-                      game.originalPlayerCards.some((card: Card | null) => !card) ||
-                      game.originalAiCards.some((card: Card | null) => !card)) {
-                      throw new Error('Failed to restore original cards');
+                  if (!game.aiHand || game.aiHand.length === 0) {
+                      await sendLogToTelegram('❌ Рука AI пуста после восстановления');
+                      return errorHandler({
+                          h,
+                          details: 'AI hand is empty after restoration',
+                          error: 'Game state restoration failed',
+                          code: 500
+                      });
+                  }
+
+                  if (game.aiHand.some(card => !card)) {
+                      await sendLogToTelegram('❌ В руке AI есть null карты', {
+                          aiHand: game.aiHand.map(c => c?.id || null)
+                      });
+                      // Попробуем восстановить руку AI из оригинальных карт
+                      if (game.originalAiCards && game.originalAiCards.length > 0) {
+                          game.aiHand = game.originalAiCards
+                              .filter(card => !game.board?.some(boardCard => boardCard?.id === card?.id))
+                              .map(card => card.clone());
+                          await sendLogToTelegram('🔄 Восстановили руку AI из оригинальных карт', {
+                              newAiHand: game.aiHand.map(c => c?.id)
+                          });
+                      }
                   }
 
                   // Восстанавливаем остальное состояние
@@ -426,6 +464,14 @@ export const gameRoutes: Record<string, ServerRoute> = {
                   }).code(400);
               }
 
+              // Проверяем состояние перед ходом AI
+              await sendLogToTelegram('🎮 Состояние перед ходом AI', {
+                  aiHandLength: game.aiHand?.length,
+                  aiCards: game.aiHand?.map(c => c?.id),
+                  boardState: game.board?.map(c => c?.id),
+                  currentTurn: game.currentTurn
+              });
+
               // Проверяем, остались ли у AI карты для хода
               if (!game.aiHand || game.aiHand.length === 0) {
                   return h.response({
@@ -437,6 +483,13 @@ export const gameRoutes: Record<string, ServerRoute> = {
               }
 
               const result = game.makeAIMove();
+
+              // Логируем результат хода
+              await sendLogToTelegram('✅ Ход AI выполнен', {
+                  moveResult: result,
+                  newBoardState: game.board?.map(c => c?.id),
+                  remainingAiCards: game.aiHand?.map(c => c?.id)
+              });
 
               // Обновляем состояние в базе данных
               await createActiveGame(
@@ -452,12 +505,13 @@ export const gameRoutes: Record<string, ServerRoute> = {
               };
           } catch (error) {
               console.error('❌ Error in AI move:', error);
-            return errorHandler({
-              h,
-              details: (error as Error).message,
-              error: 'Error in AI move',
-              code: 400,
-            });
+              return errorHandler({
+                  h,
+                  details: error instanceof Error ? error.message : 'Error in AI move',
+                  error: 'Error in AI move',
+                  code: 400,
+                  stack: error instanceof Error ? error.stack : undefined
+              });
           }
       }
   },
