@@ -123,7 +123,7 @@ export async function deleteActiveGame(gameId: string) {
     console.log('🎮 Deleting active game from database...');
     console.log('Game ID:', gameId);
 
-    const data = await client.request<{ deleteActiveGame: any }>(DELETE_ACTIVE_GAME, { gameId });
+    const data = await client.request<{ deleteActiveGame: { id: string; gameId: string; } }>(DELETE_ACTIVE_GAME, { gameId });
 
     console.log('🎮 Active game deleted:', data);
     return data.deleteActiveGame;

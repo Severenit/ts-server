@@ -431,29 +431,56 @@ export const gameRoutes: Record<string, ServerRoute> = {
       method: 'POST',
       path: '/api/game/{gameId}/exchange-card',
       handler: async (request, h) => {
-        console.log('📌: Exchange card');
+        console.log('📌: Производим обмен картами');
           const { gameId } = request.params;
           const { cardId } = request.payload as ExchangeCardPayload || {};
-          const game = gameStates.get(gameId);
+          let game = gameStates.get(gameId);
 
           if (!game) {
-              return h.response({
-                  error: 'Game not found',
-                  details: {
-                      gameId,
-                      availableGames: Array.from(gameStates.keys())
-                  }
-              }).code(404);
+              // Пытаемся восстановить игру из базы данных
+              const activeGame = await getActiveGameByGameId(gameId);
+              if (!activeGame) {
+                  return h.response({
+                      error: 'Кажется мы потеряли данные об игре :(',
+                      details: {
+                          gameId,
+                          availableGames: Array.from(gameStates.keys())
+                      }
+                  }).code(404);
+              }
+
+              // Восстанавливаем состояние игры
+              const savedState = activeGame.gameState;
+              game = new Game(savedState.settings || {}, savedState.rules || {});
+
+              // Восстанавливаем карты
+              game.board = restoreCards(savedState.board);
+              game.playerHand = restoreCards(savedState.playerHand);
+              game.aiHand = restoreCards(savedState.aiHand);
+              game.originalPlayerCards = restoreCards(savedState.originalPlayerCards);
+              game.originalAiCards = restoreCards(savedState.originalAiCards);
+
+              // Восстанавливаем остальное состояние
+              game.currentTurn = savedState.currentTurn;
+              game.playerScore = savedState.playerScore;
+              game.aiScore = savedState.aiScore;
+              game.gameStatus = savedState.gameStatus;
+              game.winner = savedState.winner;
+              game.suddenDeathRound = savedState.suddenDeathRound || 0;
+              game.boardElements = savedState.boardElements;
+              game.cardExchange = savedState.cardExchange;
+
+              // Сохраняем восстановленное состояние в память
+              gameStates.set(gameId, game);
           }
 
           if (game.gameStatus !== 'finished' || game.winner === 'draw') {
-              return h.response({
-                  error: 'Card exchange is only available for finished games with a winner',
-                  details: {
-                      gameStatus: game.gameStatus,
-                      winner: game.winner
-                  }
-              }).code(400);
+              return errorHandler({
+                  h,
+                  details: `Обмен картами доступен только после завершения игры с определенным победителем. Статус игры: ${game.gameStatus}, победитель: ${game.winner}`,
+                  error: 'Ошибка обмена картами',
+                  code: 400
+              });
           }
 
           if (game.cardExchange) {
@@ -475,23 +502,43 @@ export const gameRoutes: Record<string, ServerRoute> = {
 
               if (game.winner === 'player') {
                   if (!cardId) {
-                      return h.response({
-                          error: 'Card ID is required when player wins',
-                          details: {
-                              message: 'Please specify which card you want to take from AI'
-                          }
-                      }).code(400);
+                      return errorHandler({
+                          h,
+                          details: 'Пожалуйста, укажите какую карту вы хотите забрать у противника',
+                          error: 'Не указан ID карты для обмена',
+                          code: 400
+                      });
                   }
 
-                  const selectedCard = game.originalAiCards.find((card: Card) => card.id === cardId);
+                  // Проверяем наличие карт AI
+                  if (!game.originalAiCards || !Array.isArray(game.originalAiCards)) {
+                      return errorHandler({
+                          h,
+                          details: 'Карты противника недоступны',
+                          error: 'Ошибка состояния игры',
+                          code: 500
+                      });
+                  }
+
+                  const selectedCard = game.originalAiCards.find((card: Card | null) => card && card.id === cardId);
                   if (!selectedCard) {
-                      return h.response({
-                          error: 'Invalid card ID',
-                          details: {
-                              message: 'Selected card is not available in AI\'s hand',
-                              availableCards: game.originalAiCards.map((card: Card) => card.id)
-                          }
-                      }).code(400);
+                      return errorHandler({
+                          h,
+                          details: 'Выбранная карта недоступна в руке противника',
+                          error: 'Неверный ID карты',
+                          code: 400
+                      });
+                  }
+
+                  // Проверяем, что у карты есть метод clone
+                  if (typeof selectedCard.clone !== 'function') {
+                      console.error('Selected card does not have clone method:', selectedCard);
+                      return errorHandler({
+                          h,
+                          details: 'Выбранная карта некорректна',
+                          error: 'Ошибка состояния игры',
+                          code: 500
+                      });
                   }
 
                   exchangeResult = {
@@ -501,16 +548,24 @@ export const gameRoutes: Record<string, ServerRoute> = {
                   };
               } else {
                   exchangeResult = game.getCardExchange();
+                  // Проверяем результат обмена
+                  if (!exchangeResult || !exchangeResult.takenCard) {
+                      return errorHandler({
+                          h,
+                          details: 'Invalid exchange result',
+                          error: 'Failed to perform card exchange',
+                          code: 500
+                      });
+                  }
               }
 
               if (!exchangeResult) {
-                  return h.response({
-                      error: 'Failed to perform card exchange',
-                      details: {
-                          gameStatus: game.gameStatus,
-                          winner: game.winner
-                      }
-                  }).code(400);
+                  return errorHandler({
+                      h,
+                      details: 'Не удалось выполнить обмен картами',
+                      error: 'Результат обмена не определен',
+                      code: 400
+                  });
               }
 
               game.cardExchange = exchangeResult;
@@ -544,8 +599,12 @@ export const gameRoutes: Record<string, ServerRoute> = {
                   await deleteActiveGame(gameId);
               } catch (error) {
                   console.error('Error updating game data:', error);
-                  // Даже если произошла ошибка при обновлении данных,
-                  // мы все равно возвращаем результат обмена
+                  return errorHandler({
+                      h,
+                      details: 'Ошибка при обновлении данных игры',
+                      error,
+                      code: 500
+                  });
               }
 
               return {
@@ -558,9 +617,10 @@ export const gameRoutes: Record<string, ServerRoute> = {
                   }
               };
           } catch (error) {
+              console.error('Error updating game data:', error);
               return errorHandler({
                   h,
-                  details: 'Error during game finalization',
+                  details: 'Ошибка при обновлении данных игры',
                   error,
                   code: 500
               });

@@ -30,9 +30,12 @@ export async function getOrCreatePlayer(telegramData: GetOrCreatePlayerProps) {
       const { playerCards, ...userData } = existingUserData.user;
 
       return {
-        ...userData,
-        isNewPlayer: false,
-        cards: playerCards.map(card => card.cardId)
+        status: 'success',
+        player: {
+          ...userData,
+          isNewPlayer: false,
+          cards: playerCards.map(card => card.cardId)
+        }
       };
     }
 
@@ -113,7 +116,10 @@ export async function getOrCreatePlayer(telegramData: GetOrCreatePlayerProps) {
           cards: addedCards
         };
 
-        return result;
+        return {
+          status: 'created',
+          player: result
+        };
       } catch (error) {
         console.error('❌: Error adding starter cards:', error);
         throw error;

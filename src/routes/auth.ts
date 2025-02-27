@@ -33,7 +33,7 @@ export const authRoutes: Record<string, ServerRoute> = {
           })
         }
 
-        const player = await getOrCreatePlayer({
+        const response = await getOrCreatePlayer({
           id: user.id,
           username: user.username,
           first_name: user.first_name,
@@ -42,10 +42,7 @@ export const authRoutes: Record<string, ServerRoute> = {
           hash: user.hash,
         });
 
-        return {
-          status: 'success',
-          player,
-        }
+        return response;
       } catch (e) {
         console.error('❌: Ошибка валидации данных Telegram:', e);
         return errorHandler({
@@ -65,7 +62,7 @@ export const authRoutes: Record<string, ServerRoute> = {
         console.log('📌: \'/api/users/{telegram_id}\' Получение данных пользователя для telegram_id:', telegram_id);
 
         // Получаем данные игрока
-        const player = await getOrCreatePlayer({
+        const { status, player } = await getOrCreatePlayer({
           id: telegram_id
         });
 
@@ -77,13 +74,11 @@ export const authRoutes: Record<string, ServerRoute> = {
             code: 404,
           });
         }
-
         // Получаем карты игрока
         const cards = player.cards;
 
-        // Формируем ответ
-        const response = {
-          status: 'success',
+        return  {
+          status,
           player: {
             id: player.id,
             telegram_id: player.telegram_id,
@@ -97,9 +92,6 @@ export const authRoutes: Record<string, ServerRoute> = {
             activeGame: player?.activeGame || null,
           }
         };
-
-        return response;
-
       } catch (error) {
         console.error('❌: Error getting user data:', error);
         return h.response({

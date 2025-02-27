@@ -369,7 +369,7 @@ export class Game {
             const originalPlayerCards = this.board
                 .filter(card => card && card.originalOwner === 'player')
                 .map(card => card.toClientObject(false));
-            
+
             const originalAiCards = this.board
                 .filter(card => card && card.originalOwner === 'ai')
                 .map(card => card.toClientObject(false));
