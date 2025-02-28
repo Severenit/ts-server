@@ -299,13 +299,18 @@ export const gameRoutes: Record<string, ServerRoute> = {
                       // Пытаемся восстановить игру из базы данных
                       const activeGame = await getActiveGameByGameId(gameId);
                       if (!activeGame) {
-                          return h.response({
-                              error: 'Кажется мы потеряли данные об игре :(',
-                              details: {
-                                  gameId,
-                                  availableGames: Array.from(gameStates.keys())
-                              }
-                          }).code(404);
+                          return errorHandler({
+                              h,
+                              details: 'Кажется мы потеряли данные об игре :(',
+                              error: {
+                                  message: 'Game not found',
+                                  details: {
+                                      gameId,
+                                      availableGames: Array.from(gameStates.keys())
+                                  }
+                              },
+                              code: 404
+                          });
                       }
 
                       await sendLogToTelegram('🔄 Восстанавливаем состояние игры из БД', {
@@ -726,13 +731,18 @@ export const gameRoutes: Record<string, ServerRoute> = {
           // Пытаемся восстановить игру из базы данных
           const activeGame = await getActiveGameByGameId(gameId);
           if (!activeGame) {
-              return h.response({
-                  error: 'Кажется мы потеряли данные об игре :(',
-                  details: {
-                      gameId,
-                      availableGames: Array.from(gameStates.keys())
-                  }
-              }).code(404);
+              return errorHandler({
+                  h,
+                  details: 'Кажется мы потеряли данные об игре :(',
+                  error: {
+                      message: 'Game not found',
+                      details: {
+                          gameId,
+                          availableGames: Array.from(gameStates.keys())
+                      }
+                  },
+                  code: 404
+              });
           }
 
           // Восстанавливаем состояние игры
