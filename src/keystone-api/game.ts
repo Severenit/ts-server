@@ -21,14 +21,14 @@ export async function getActiveGameByGameId(gameId: string) {
     const data = await client.request<{ activeGame: any }>(GET_ACTIVE_GAME, { gameId });
 
     if (!data.activeGame) {
-      console.log('🎮 No active game found with ID:', gameId);
+      console.log('🎮 Нет активной игры с ID:', gameId);
       return null;
     }
 
-    console.log('🎮 Found active game:', data.activeGame);
+    console.log('🎮 Найдена активная игра:', data.activeGame);
     return data.activeGame;
   } catch (error) {
-    console.error('❌ Error getting active game:', error);
+    console.error('❌ Ошибка получения активной игры:', error);
     throw error;
   }
 }
@@ -42,7 +42,7 @@ export async function getActiveGameByGameId(gameId: string) {
  */
 export async function createNewActiveGame(userId: string, gameId: string, gameState: any) {
   try {
-    console.log('🎮 Creating new active game in database...');
+    console.log('🎮 Создаем новую активную игру в базе данных...');
 
     const createData = await client.request<{ createActiveGame: ActiveGame }>(CREATE_ACTIVE_GAME, {
       userId,
@@ -55,7 +55,7 @@ export async function createNewActiveGame(userId: string, gameId: string, gameSt
 
     return createData.createActiveGame;
   } catch (error) {
-    console.error('❌ Error creating new active game:', error);
+    console.error('❌ Ошибка создания активной игры:', error);
     throw error;
   }
 }
@@ -68,7 +68,7 @@ export async function createNewActiveGame(userId: string, gameId: string, gameSt
  */
 export async function updateActiveGame(gameId: string, gameState: GameState,) {
   try {
-    console.log('🎮 Updating active game in database...');
+    console.log('🎮 Обновляем активную игру в базе данных...');
 
     const updateData = await client.request<{ updateActiveGame: ActiveGame }>(UPDATE_ACTIVE_GAME, {
       gameId,
@@ -77,10 +77,10 @@ export async function updateActiveGame(gameId: string, gameState: GameState,) {
         gameId
       }
     });
-    console.log(updateData);
+
     return updateData.updateActiveGame;
   } catch (error) {
-    console.error('❌ Error updating active game:', error);
+    console.error('❌ Ошибка обновления активной игры:', error);
     throw error;
   }
 }

@@ -104,7 +104,7 @@ export async function getOrCreatePlayer(telegramData: GetOrCreatePlayerProps) {
         }
 
         try {
-          await bot.sendMessage(userWithCards.user.id, '🎉 Поздравляем! Вы успешно зарегистрировались в Triple Triad!');
+          await bot.sendMessage(newUser.telegram_id, '🎉 Поздравляем! Вы успешно зарегистрировались в Triple Triad!');
         } catch (error) {
           console.error('❌: Error sending welcome TG message:', error);
         }

@@ -413,6 +413,9 @@ export class Game {
      * @returns {Object} Результат хода
      */
     makeMove(cardIndex, position) {
+        cardIndex = parseInt(cardIndex, 0);
+        position = parseInt(position, 0);
+
         if (this.gameStatus === 'finished') {
             throw new Error('Game is already finished');
         }
@@ -421,8 +424,8 @@ export class Game {
             throw new Error('Not player\'s turn');
         }
 
-        if (position < 0 || position >= 9 || this.board[position] !== null) {
-            throw new Error('Invalid position');
+        if (position < 0 || position >= 9) {
+            throw new Error(`Invalid position = ${position} = ${this.board}`);
         }
 
         if (cardIndex < 0 || cardIndex >= this.playerHand.length) {
@@ -450,7 +453,7 @@ export class Game {
             placedCard: card.toClientObject(false),
             position,
             capturedCards: captureResult.capturedCards.map(({ position, card }) => ({
-                position,
+                position: parseInt(position, 0),
                 card: card.toClientObject(false)
             })),
             captureDirections: captureResult.captureDirections,
