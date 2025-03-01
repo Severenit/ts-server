@@ -10,6 +10,7 @@ export class Card {
         this.imageUrl = imageUrl || `/img/cards/${id.padStart(3, '0')}.png`;
         this.owner = null;
         this.originalOwner = null;
+        this.position = null;
     }
 
     static createDeck() {

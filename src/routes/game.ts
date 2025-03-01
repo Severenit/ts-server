@@ -55,7 +55,6 @@ function restoreCards(cards: PlayerCard[], boardName: string) {
       }
 
       restoredCard.owner = cardData.owner;
-      // @ts-expect-error
       restoredCard.position = cardData.position;
 
       console.log(`✅ Successfully restored card ${cardData.id}`);
@@ -376,27 +375,26 @@ export const gameRoutes: Record<string, ServerRoute> = {
                   }
               }
 
-              const board = game.board.length === 0 ? Array(9).fill(null) : game.board;
-              // Проверяем состояние перед ходом игрока
-              const gameStateBeforeMove = {
-                  board: {
-                      isArray: Array.isArray(game.board),
-                      length: game.board.length,
-                      content: game.board,
-                      nullPositions: game.board
-                          .map((cell: Card | null, index: number) => ({ pos: index, isEmpty: cell === null }))
-                          .filter((pos: { pos: number; isEmpty: boolean }) => pos.isEmpty)
-                          .map((pos: { pos: number }) => pos.pos)
-                  },
-                  playerHand: {
-                      length: game.playerHand?.length,
-                      cards: game.playerHand?.map((c: Card | null) => c?.id)
-                  },
-                  currentTurn: game.currentTurn,
-                  gameStatus: game.gameStatus
-              };
 
-              await sendLogToTelegram('🎮 Состояние игры перед ходом игрока', gameStateBeforeMove);
+              // Проверяем состояние перед ходом игрока
+              // const gameStateBeforeMove = {
+              //     board: {
+              //         isArray: Array.isArray(game.board),
+              //         length: game.board.length,
+              //         content: game.board,
+              //         nullPositions: game.board
+              //             .map((cell: Card | null, index: number) => ({ pos: index, isEmpty: cell === null }))
+              //             .filter((pos: { pos: number; isEmpty: boolean }) => pos.isEmpty)
+              //             .map((pos: { pos: number }) => pos.pos)
+              //     },
+              //     playerHand: {
+              //         length: game.playerHand?.length,
+              //         cards: game.playerHand?.map((c: Card | null) => c?.id)
+              //     },
+              //     currentTurn: game.currentTurn,
+              //     gameStatus: game.gameStatus
+              // };
+              // await sendLogToTelegram('🎮 Состояние игры перед ходом игрока', gameStateBeforeMove);
 
               // Проверяем, чей сейчас ход
               if (game.currentTurn !== 'player') {
@@ -417,13 +415,13 @@ export const gameRoutes: Record<string, ServerRoute> = {
               // Обновляем состояние в базе данных
               try {
                   const gameState = game.getState();
-                  await sendLogToTelegram('📝 Сохраняем состояние игры после хода', {
-                      userId: game.settings.userId,
-                      gameId,
-                      board: gameState.board.map((card: Card | null) => card ? { id: card.id, name: card.name } : null),
-                      currentTurn: gameState.currentTurn,
-                      stateSize: JSON.stringify(gameState).length
-                  });
+                  // await sendLogToTelegram('📝 Сохраняем состояние игры после хода', {
+                  //     userId: game.settings.userId,
+                  //     gameId,
+                  //     board: gameState.board.map((card: Card | null) => card ? { id: card.id, name: card.name } : null),
+                  //     currentTurn: gameState.currentTurn,
+                  //     stateSize: JSON.stringify(gameState).length
+                  // });
 
                   // Проверяем существование игры перед обновлением
                   const existingGame = await getActiveGameByGameId(gameId);
@@ -443,10 +441,10 @@ export const gameRoutes: Record<string, ServerRoute> = {
                       gameState
                   );
 
-                  await sendLogToTelegram('✅ Состояние игры успешно обновлено', {
-                      gameId,
-                      currentTurn: gameState.currentTurn
-                  });
+                  // await sendLogToTelegram('✅ Состояние игры успешно обновлено', {
+                  //     gameId,
+                  //     currentTurn: gameState.currentTurn
+                  // });
 
                   return {
                       status: 'move completed',

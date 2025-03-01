@@ -15,8 +15,8 @@ import { ActiveGame, GameState } from '../types/game.js';
  */
 export async function getActiveGameByGameId(gameId: string) {
   try {
-    console.log('🎮 Getting active game from database...');
-    console.log('Game ID:', gameId);
+    console.log('🎮 Запрашиваем игру из базы данных...');
+    console.log('ID игры:', gameId);
 
     const data = await client.request<{ activeGame: any }>(GET_ACTIVE_GAME, { gameId });
 
