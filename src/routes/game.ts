@@ -174,27 +174,39 @@ export const gameRoutes: Record<string, ServerRoute> = {
         let game = gameStates.get(gameId);
 
         if (!game) {
+          await sendLogToTelegram('🔄 Восстанавливаем игру из БД (`getGameState`)', { gameId });
           // Если локального состояния нет, пытаемся получить из базы данных
           const activeGame = await getActiveGameByGameId(gameId);
 
           if (!activeGame) {
-            return h.response({ error: 'Game not found' }).code(404);
+            return errorHandler({
+              h, details: 'Кажется мы потеряли данные об игре :(', error: {
+                message: 'Game not found', details: {
+                  gameId, availableGames: Array.from(gameStates.keys()),
+                },
+              }, code: 404,
+            });
           }
 
-          console.log('🎮 Found game in database, restoring state...');
-
-          // Восстанавливаем состояние игры из сохраненного состояния
+          // Восстанавливаем состояние игры
           const savedState = activeGame.gameState;
-
-          // Создаем новую игру с сохраненными настройками
           game = new Game(savedState.settings || {}, savedState.rules || {});
+          // Проверяем и восстанавливаем доску
+          if (!Array.isArray(savedState.board)) {
+            await sendLogToTelegram('⚠️ Доска в сохраненном состоянии не является массивом', {
+              board: savedState.board, type: typeof savedState.board,
+            });
+            game.board = Array(9).fill(null);
+          } else if (savedState.board.length !== 9) {
+            await sendLogToTelegram('⚠️ Некорректная длина доски', {
+              length: savedState.board.length,
+            });
 
-          // Инициализируем пустую доску
-          game.board = Array(9).fill(null);
-
-          // Проверяем и восстанавливаем доску из сохраненного состояния
-          if (Array.isArray(savedState.board) && savedState.board.length === 9) {
+            game.board = Array(9).fill(null);
+          } else {
+            // Восстанавливаем карты на доске
             const restoredBoard = restoreCards(savedState.board, 'restoredBoard');
+            game.board = Array(9).fill(null);
             // Копируем только валидные карты, сохраняя null для пустых позиций
             savedState.board.forEach((card: Card | null, index: number) => {
               if (card) {
@@ -203,35 +215,40 @@ export const gameRoutes: Record<string, ServerRoute> = {
             });
           }
 
-          // await sendLogToTelegram('🎮 Состояние доски после инициализации', {
-          //   board: game.board,
-          //   length: game.board.length,
-          //   nullCount: game.board.filter((cell: Card | null) => cell === null).length,
-          // });
-
-          // Восстанавливаем карты
           game.playerHand = restoreCards(savedState.playerHand, 'playerHand');
           game.aiHand = restoreCards(savedState.aiHand, 'aiHand');
-          game.originalPlayerCards = restoreCards(savedState.originalPlayerCards, 'originalPlayerCards');
-          game.originalAiCards = restoreCards(savedState.originalAiCards, 'originalAiCards');
+
+          // Особое внимание к восстановлению оригинальных карт
+          if (savedState.originalPlayerCards && savedState.originalAiCards) {
+            game.originalPlayerCards = restoreCards(savedState.originalPlayerCards, 'originalPlayerCards');
+            game.originalAiCards = restoreCards(savedState.originalAiCards, 'originalAiCards');
+          } else {
+            // Если оригинальных карт нет, копируем из начальных рук
+            game.originalPlayerCards = game.playerHand.map((card: Card) => card.clone());
+            game.originalAiCards = game.aiHand.map((card: Card) => card.clone());
+          }
 
           // Восстанавливаем остальное состояние с значениями по умолчанию
-          await sendLogToTelegram('🔄 Восстанавливаем currentTurn', {
-            savedTurn: savedState.currentTurn, defaultTurn: 'player',
-          });
+          // await sendLogToTelegram('🔄 Восстанавливаем currentTurn', {
+          //   savedTurn: savedState.currentTurn, defaultTurn: 'player',
+          // });
           game.currentTurn = savedState.currentTurn || 'player';
           game.playerScore = savedState.playerScore || 5;
           game.aiScore = savedState.aiScore || 5;
-          game.gameStatus = savedState.gameStatus;
-          game.winner = savedState.winner;
+          game.gameStatus = savedState.gameStatus || 'playing';
+          game.winner = savedState.winner || null;
           game.suddenDeathRound = savedState.suddenDeathRound || 0;
-          game.boardElements = savedState.boardElements;
-          game.cardExchange = savedState.cardExchange;
+          game.boardElements = Array.isArray(savedState.boardElements) ? savedState.boardElements : Array(9).fill(null);
+          game.cardExchange = savedState.cardExchange || null;
 
+          if (!Array.isArray(game.board) || game.board.length !== 9) {
+            await sendLogToTelegram('❌ Критическая ошибка: некорректная доска после восстановления');
+            return errorHandler({
+              h, details: 'Invalid board state after restoration', error: 'Game state error', code: 500,
+            });
+          }
           // Сохраняем восстановленное состояние в память
           gameStates.set(gameId, game);
-
-          console.log('🎮 Game state restored successfully');
         }
 
         return game.getState();
@@ -271,7 +288,6 @@ export const gameRoutes: Record<string, ServerRoute> = {
             // Восстанавливаем состояние игры
             const savedState = activeGame.gameState;
             game = new Game(savedState.settings || {}, savedState.rules || {});
-            console.log('>>>: savedState.board', savedState.board);
             // Проверяем и восстанавливаем доску
             if (!Array.isArray(savedState.board)) {
               await sendLogToTelegram('⚠️ Доска в сохраненном состоянии не является массивом', {
@@ -294,10 +310,6 @@ export const gameRoutes: Record<string, ServerRoute> = {
                   game.board[index] = restoredBoard.find(c => c.id === card.id) || null;
                 }
               });
-
-              // await sendLogToTelegram('✅ Восстановлена доска', {
-              //   board: game.board.map((card: Card | null) => card ? { id: card.id, name: card.name } : null)
-              // });
             }
 
             game.playerHand = restoreCards(savedState.playerHand, 'playerHand');
@@ -314,9 +326,9 @@ export const gameRoutes: Record<string, ServerRoute> = {
             }
 
             // Восстанавливаем остальное состояние
-            await sendLogToTelegram('🔄 Восстанавливаем currentTurn', {
-              savedTurn: savedState.currentTurn, defaultTurn: 'player',
-            });
+            // await sendLogToTelegram('🔄 Восстанавливаем currentTurn', {
+            //   savedTurn: savedState.currentTurn, defaultTurn: 'player',
+            // });
             game.currentTurn = savedState.currentTurn || 'player';
             game.playerScore = savedState.playerScore || 5;
             game.aiScore = savedState.aiScore || 5;
@@ -327,17 +339,17 @@ export const gameRoutes: Record<string, ServerRoute> = {
             game.cardExchange = savedState.cardExchange || null;
 
             // Проверяем состояние перед сохранением
-            const validationState = {
-              board: {
-                isArray: Array.isArray(game.board), length: game.board?.length, content: game.board,
-              }, aiHand: {
-                isArray: Array.isArray(game.aiHand),
-                length: game.aiHand?.length,
-                cards: game.aiHand?.map((c: Card | null) => c?.id),
-              }, currentTurn: game.currentTurn,
-            };
+            // const validationState = {
+            //   board: {
+            //     isArray: Array.isArray(game.board), length: game.board?.length, content: game.board,
+            //   }, aiHand: {
+            //     isArray: Array.isArray(game.aiHand),
+            //     length: game.aiHand?.length,
+            //     cards: game.aiHand?.map((c: Card | null) => c?.id),
+            //   }, currentTurn: game.currentTurn,
+            // };
 
-            await sendLogToTelegram('🔍 Валидация состояния игры перед сохранением', validationState);
+            // await sendLogToTelegram('🔍 Валидация состояния игры перед сохранением', validationState);
 
             if (!Array.isArray(game.board) || game.board.length !== 9) {
               await sendLogToTelegram('❌ Критическая ошибка: некорректная доска после восстановления');
@@ -362,22 +374,22 @@ export const gameRoutes: Record<string, ServerRoute> = {
         }
 
         // Проверяем состояние перед ходом игрока
-        const gameStateBeforeMove = {
-          board: {
-            isArray: Array.isArray(game.board),
-            length: game.board.length,
-            content: game.board,
-            nullPositions: game.board
-              .map((cell: Card | null, index: number) => ({ pos: index, isEmpty: cell === null }))
-              .filter((pos: { pos: number; isEmpty: boolean }) => pos.isEmpty)
-              .map((pos: { pos: number }) => pos.pos),
-          },
-          playerHand: {
-            length: game.playerHand?.length,
-            cards: game.playerHand?.map((c: Card | null) => c?.id),
-          },
-          currentTurn: game.currentTurn,
-        };
+        // const gameStateBeforeMove = {
+        //   board: {
+        //     isArray: Array.isArray(game.board),
+        //     length: game.board.length,
+        //     content: game.board,
+        //     nullPositions: game.board
+        //       .map((cell: Card | null, index: number) => ({ pos: index, isEmpty: cell === null }))
+        //       .filter((pos: { pos: number; isEmpty: boolean }) => pos.isEmpty)
+        //       .map((pos: { pos: number }) => pos.pos),
+        //   },
+        //   playerHand: {
+        //     length: game.playerHand?.length,
+        //     cards: game.playerHand?.map((c: Card | null) => c?.id),
+        //   },
+        //   currentTurn: game.currentTurn,
+        // };
         // TODO: Turn on when if we want see logs
         // await sendLogToTelegram('🎮 Состояние игры перед ходом игрока', gameStateBeforeMove);
 
@@ -672,7 +684,7 @@ export const gameRoutes: Record<string, ServerRoute> = {
   exchangeCard: {
     method: 'POST' as const, path: '/api/game/{gameId}/exchange-card', handler: async (request, h) => {
       console.log('📌: Производим обмен картами');
-      await sendLogToTelegram('📌 Начинаем процесс обмена картами');
+      // await sendLogToTelegram('📌 Начинаем процесс обмена картами');
 
       const { gameId } = request.params;
       const { cardId } = request.payload as ExchangeCardPayload || {};
@@ -741,7 +753,7 @@ export const gameRoutes: Record<string, ServerRoute> = {
         };
 
         console.log('🔍 Детальная проверка восстановленных карт:', cardsState);
-        await sendLogToTelegram('🔍 Состояние карт после восстановления', cardsState);
+        // await sendLogToTelegram('🔍 Состояние карт после восстановления', cardsState);
 
         // Восстанавливаем остальное состояние
         game.currentTurn = savedState.currentTurn;
