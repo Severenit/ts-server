@@ -75,14 +75,55 @@ const MIN_REQUEST_INTERVAL = 2000;
 // Set для хранения ID удаленных игр
 const deletedGames = new Set();
 
+// Set для кэширования ID несуществующих игр
+const nonExistentGames = new Set();
+
 // Флаг технического обслуживания
 const MAINTENANCE_MODE = false;
 
 // Map для отслеживания количества запросов
 const requestCounts = new Map();
 
+// Версия API
+const API_VERSION = '1.0.0';
+const MIN_SUPPORTED_VERSION = '1.0.0';
+
+// Функция проверки версии клиента
+function checkClientVersion(clientVersion: string | undefined): boolean {
+  if (!clientVersion) return false;
+  
+  const [majorClient, minorClient, patchClient] = clientVersion.split('.').map(Number);
+  const [majorMin, minorMin, patchMin] = MIN_SUPPORTED_VERSION.split('.').map(Number);
+  
+  if (majorClient < majorMin) return false;
+  if (majorClient === majorMin && minorClient < minorMin) return false;
+  if (majorClient === majorMin && minorClient === minorMin && patchClient < patchMin) return false;
+  
+  return true;
+}
+
+// Middleware для проверки версии
+function versionCheck(request: any, h: any) {
+  const clientVersion = request.headers['x-client-version'];
+  
+  if (!checkClientVersion(clientVersion)) {
+    return errorHandler({
+      h,
+      details: 'Пожалуйста, обновите приложение до последней версии',
+      error: 'Outdated client version',
+      code: 426, // Upgrade Required
+      meta: {
+        currentVersion: API_VERSION,
+        minSupported: MIN_SUPPORTED_VERSION
+      }
+    });
+  }
+  
+  return null;
+}
+
 // Функция для логирования запросов
-async function logRequest(gameId: string, request: any) {
+async function logRequest(gameId: string, telegramData: string, request: any) {
   const now = Date.now();
   const key = `${gameId}_${request.info.remoteAddress}`;
   const count = (requestCounts.get(key) || 0) + 1;
@@ -97,9 +138,16 @@ async function logRequest(gameId: string, request: any) {
       path: request.path,
       method: request.method,
       timestamp: new Date().toISOString(),
-      referer: request.headers.referer || 'unknown'
+      referer: request.headers.referer || 'unknown',
+      telegramData,
     });
+
+    // Если игра не существует и запросы продолжаются, добавляем в чёрный список
+    if (nonExistentGames.has(gameId)) {
+      return true; // Сигнализируем о необходимости блокировки запроса
+    }
   }
+  return false;
 }
 
 interface PlayerCardSettings {
@@ -133,9 +181,27 @@ interface UpdateGameStatsPayload {
 }
 
 export const gameRoutes: Record<string, ServerRoute> = {
+  // Получение версии API
+  getVersion: {
+    method: 'GET' as const,
+    path: '/api/version',
+    handler: async (request, h) => {
+      return {
+        version: API_VERSION,
+        minSupported: MIN_SUPPORTED_VERSION
+      };
+    }
+  },
+
   // Создание новой игры
   createGame: {
-    method: 'POST' as const, path: '/api/game/new', handler: async (request, h) => {
+    method: 'POST' as const,
+    path: '/api/game/new',
+    handler: async (request, h) => {
+      // Проверяем версию клиента
+      const versionError = versionCheck(request, h);
+      if (versionError) return versionError;
+
       // Проверка на техническое обслуживание
       if (MAINTENANCE_MODE) {
         return errorHandler({
@@ -212,18 +278,21 @@ export const gameRoutes: Record<string, ServerRoute> = {
   // Получение состояния игры
   getGameState: {
     method: 'GET' as const, path: '/api/game/{gameId}', handler: async (request, h) => {
+      // Проверяем версию клиента
+      const versionError = versionCheck(request, h);
+      if (versionError) return versionError;
+
       const { gameId } = request.params;
+      const telegramData = request.headers['telegram-data'];
+      await logRequest(gameId, telegramData, request);
 
-      // Логируем запрос
-      await logRequest(gameId, request);
-
-      // Проверка на техническое обслуживание
-      if (MAINTENANCE_MODE) {
+      // Проверяем, известно ли что игра не существует
+      if (nonExistentGames.has(gameId)) {
         return errorHandler({
           h,
-          details: 'Сервер временно недоступен. Проводятся технические работы.',
-          error: 'Maintenance',
-          code: 503
+          details: 'Игра завершена или не существует. Пожалуйста, начните новую игру.',
+          error: 'Game not found',
+          code: 410 // Gone - указывает что ресурс больше не доступен
         });
       }
 
@@ -234,6 +303,9 @@ export const gameRoutes: Record<string, ServerRoute> = {
           const activeGame = await getActiveGameByGameId(gameId);
 
           if (!activeGame) {
+            // Добавляем игру в список несуществующих
+            nonExistentGames.add(gameId);
+            
             return errorHandler({
               h,
               details: 'Игра не найдена',
@@ -250,8 +322,8 @@ export const gameRoutes: Record<string, ServerRoute> = {
           game.board = restoreCards(savedState.board, 'board');
           game.playerHand = restoreCards(savedState.playerHand, 'playerHand');
           game.aiHand = restoreCards(savedState.aiHand, 'aiHand');
-          game.originalPlayerCards = savedState.originalPlayerCards ? restoreCards(savedState.originalPlayerCards, 'originalPlayerCards') : game.playerHand.map(card => card.clone());
-          game.originalAiCards = savedState.originalAiCards ? restoreCards(savedState.originalAiCards, 'originalAiCards') : game.aiHand.map(card => card.clone());
+          game.originalPlayerCards = savedState.originalPlayerCards ? restoreCards(savedState.originalPlayerCards, 'originalPlayerCards') : game.playerHand.map((card: Card) => card.clone());
+          game.originalAiCards = savedState.originalAiCards ? restoreCards(savedState.originalAiCards, 'originalAiCards') : game.aiHand.map((card: Card) => card.clone());
 
           // Восстанавливаем остальное состояние
           game.currentTurn = savedState.currentTurn || 'player';
@@ -282,7 +354,13 @@ export const gameRoutes: Record<string, ServerRoute> = {
 
   // Выполнение хода игрока
   playerMove: {
-    method: 'POST' as const, path: '/api/game/{gameId}/player-move', handler: async (request, h) => {
+    method: 'POST' as const,
+    path: '/api/game/{gameId}/player-move',
+    handler: async (request, h) => {
+      // Проверяем версию клиента
+      const versionError = versionCheck(request, h);
+      if (versionError) return versionError;
+
       // Проверка на техническое обслуживание
       if (MAINTENANCE_MODE) {
         return errorHandler({
@@ -507,7 +585,13 @@ export const gameRoutes: Record<string, ServerRoute> = {
   }, //
   // Выполнение хода AI
   aiMove: {
-    method: 'GET' as const, path: '/api/game/{gameId}/ai-move', handler: async (request, h) => {
+    method: 'GET' as const,
+    path: '/api/game/{gameId}/ai-move',
+    handler: async (request, h) => {
+      // Проверяем версию клиента
+      const versionError = versionCheck(request, h);
+      if (versionError) return versionError;
+
       const { gameId } = request.params;
 
       try {
@@ -717,7 +801,13 @@ export const gameRoutes: Record<string, ServerRoute> = {
 
   // Выполнение обмена картами
   exchangeCard: {
-    method: 'POST' as const, path: '/api/game/{gameId}/exchange-card', handler: async (request, h) => {
+    method: 'POST' as const,
+    path: '/api/game/{gameId}/exchange-card',
+    handler: async (request, h) => {
+      // Проверяем версию клиента
+      const versionError = versionCheck(request, h);
+      if (versionError) return versionError;
+
       console.log('📌: Производим обмен картами');
       // await sendLogToTelegram('📌 Начинаем процесс обмена картами');
 

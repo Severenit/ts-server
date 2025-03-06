@@ -25,12 +25,14 @@ export function errorHandler({
   error,
   stack,
   code = 500,
+  meta,
 }: {
   h: ResponseToolkit,
   details: string,
   error: unknown,
   code?: number
   stack?: string
+  meta?: Record<string, unknown>
 })
 {
   // Формируем сообщение для Telegram
@@ -38,7 +40,8 @@ export function errorHandler({
 📝 Детали: ${details}
 ❌ Ошибка: ${error instanceof Error ? error.message : error}
 🔢 Код: ${code}
-${stack ? `\n📚 Стек:\n\`\`\`\n${stack}\n\`\`\`` : ''}`;
+${stack ? `\n📚 Стек:\n\`\`\`\n${stack}\n\`\`\`` : ''}
+${meta ? `\n📊 Мета:\n\`\`\`json\n${JSON.stringify(meta, null, 2)}\n\`\`\`` : ''}`;
 
   // Отправляем сообщение в Telegram
   bot.sendMessage(ADMIN_CHAT_ID, errorMessage, { parse_mode: 'Markdown' })
@@ -51,6 +54,7 @@ ${stack ? `\n📚 Стек:\n\`\`\`\n${stack}\n\`\`\`` : ''}`;
     message: details || 'Произошла неизвестная ошибка',
     error: error instanceof Error ? error.message : String(error),
     ...(process.env.NODE_ENV === 'development' && { stack }),
+    ...(meta && { meta }),
   };
 
   return h.response(errorResponse).code(code);
