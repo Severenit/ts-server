@@ -169,24 +169,44 @@ export const gameRoutes: Record<string, ServerRoute> = {
   getGameState: {
     method: 'GET' as const, path: '/api/game/{gameId}', handler: async (request, h) => {
       const { gameId } = request.params;
+      const userAgent = request.headers['user-agent'];
+      const ip = request.info.remoteAddress;
 
       try {
-        // Сначала проверяем локальное состояние
+        // Логируем каждый запрос
+        await sendLogToTelegram('📥 Получен запрос на получение состояния игры', {
+          gameId,
+          userAgent,
+          ip,
+          timestamp: new Date().toISOString()
+        });
+
         let game = gameStates.get(gameId);
 
         if (!game) {
-          // Если локального состояния нет, пытаемся получить из базы данных
           const activeGame = await getActiveGameByGameId(gameId);
 
           if (!activeGame) {
+            // Логируем неудачную попытку получения игры
+            await sendLogToTelegram('❌ Игра не найдена', {
+              gameId,
+              userAgent,
+              ip,
+              timestamp: new Date().toISOString()
+            });
+
             return errorHandler({
               h,
               details: 'Кажется мы потеряли данные об игре :(',
+              error: 'Game not found',
+              code: 404,
               stack: JSON.stringify({
                 gameId,
                 availableGames: Array.from(gameStates.keys()),
-              }),
-              error: 'Game not found', code: 404,
+                userAgent,
+                ip,
+                timestamp: new Date().toISOString()
+              })
             });
           }
 
