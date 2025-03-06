@@ -75,6 +75,9 @@ const MIN_REQUEST_INTERVAL = 2000;
 // Set для хранения ID удаленных игр
 const deletedGames = new Set();
 
+// Флаг технического обслуживания
+const MAINTENANCE_MODE = true;
+
 interface PlayerCardSettings {
   cardInfo: {
     id: string;
@@ -109,6 +112,16 @@ export const gameRoutes: Record<string, ServerRoute> = {
   // Создание новой игры
   createGame: {
     method: 'POST' as const, path: '/api/game/new', handler: async (request, h) => {
+      // Проверка на техническое обслуживание
+      if (MAINTENANCE_MODE) {
+        return errorHandler({
+          h,
+          details: 'Сервер временно недоступен. Проводятся технические работы.',
+          error: 'Maintenance',
+          code: 503
+        });
+      }
+
       try {
         const gameId = Date.now().toString();
         const { settings: s, level } = request.payload as GamePayload;
@@ -175,6 +188,16 @@ export const gameRoutes: Record<string, ServerRoute> = {
   // Получение состояния игры
   getGameState: {
     method: 'GET' as const, path: '/api/game/{gameId}', handler: async (request, h) => {
+      // Проверка на техническое обслуживание
+      if (MAINTENANCE_MODE) {
+        return errorHandler({
+          h,
+          details: 'Сервер временно недоступен. Проводятся технические работы.',
+          error: 'Maintenance',
+          code: 503
+        });
+      }
+
       const { gameId } = request.params;
 
       try {
@@ -233,6 +256,16 @@ export const gameRoutes: Record<string, ServerRoute> = {
   // Выполнение хода игрока
   playerMove: {
     method: 'POST' as const, path: '/api/game/{gameId}/player-move', handler: async (request, h) => {
+      // Проверка на техническое обслуживание
+      if (MAINTENANCE_MODE) {
+        return errorHandler({
+          h,
+          details: 'Сервер временно недоступен. Проводятся технические работы.',
+          error: 'Maintenance',
+          code: 503
+        });
+      }
+
       const { gameId } = request.params;
       const { cardIndex, position } = request.payload as PlayerMovePayload;
 
@@ -932,6 +965,16 @@ export const gameRoutes: Record<string, ServerRoute> = {
   // Обновление статистики игры
   updateGameStats: {
     method: 'POST' as const, path: '/api/game/{gameId}/stats', handler: async (request, h) => {
+      // Проверка на техническое обслуживание
+      if (MAINTENANCE_MODE) {
+        return errorHandler({
+          h,
+          details: 'Сервер временно недоступен. Проводятся технические работы.',
+          error: 'Maintenance',
+          code: 503
+        });
+      }
+
       const { gameId } = request.params;
       const { statsId, isWin, isDraw, wonCards = [], lostCards = [] } = request.payload as UpdateGameStatsPayload;
 
@@ -971,6 +1014,16 @@ export const gameRoutes: Record<string, ServerRoute> = {
   // Удаление игры
   deleteGame: {
     method: 'DELETE' as const, path: '/api/game/{gameId}', handler: async (request, h) => {
+      // Проверка на техническое обслуживание
+      if (MAINTENANCE_MODE) {
+        return errorHandler({
+          h,
+          details: 'Сервер временно недоступен. Проводятся технические работы.',
+          error: 'Maintenance',
+          code: 503
+        });
+      }
+
       const { gameId } = request.params;
 
       try {
