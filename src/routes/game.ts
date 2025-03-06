@@ -76,7 +76,31 @@ const MIN_REQUEST_INTERVAL = 2000;
 const deletedGames = new Set();
 
 // Флаг технического обслуживания
-const MAINTENANCE_MODE = true;
+const MAINTENANCE_MODE = false;
+
+// Map для отслеживания количества запросов
+const requestCounts = new Map();
+
+// Функция для логирования запросов
+async function logRequest(gameId: string, request: any) {
+  const now = Date.now();
+  const key = `${gameId}_${request.info.remoteAddress}`;
+  const count = (requestCounts.get(key) || 0) + 1;
+  requestCounts.set(key, count);
+
+  if (count > 10) { // Если больше 10 запросов от одного IP к одной игре
+    await sendLogToTelegram('🚨 Подозрительная активность', {
+      gameId,
+      ip: request.info.remoteAddress,
+      userAgent: request.headers['user-agent'],
+      requestCount: count,
+      path: request.path,
+      method: request.method,
+      timestamp: new Date().toISOString(),
+      referer: request.headers.referer || 'unknown'
+    });
+  }
+}
 
 interface PlayerCardSettings {
   cardInfo: {
@@ -188,6 +212,11 @@ export const gameRoutes: Record<string, ServerRoute> = {
   // Получение состояния игры
   getGameState: {
     method: 'GET' as const, path: '/api/game/{gameId}', handler: async (request, h) => {
+      const { gameId } = request.params;
+
+      // Логируем запрос
+      await logRequest(gameId, request);
+
       // Проверка на техническое обслуживание
       if (MAINTENANCE_MODE) {
         return errorHandler({
@@ -197,8 +226,6 @@ export const gameRoutes: Record<string, ServerRoute> = {
           code: 503
         });
       }
-
-      const { gameId } = request.params;
 
       try {
         let game = gameStates.get(gameId);
