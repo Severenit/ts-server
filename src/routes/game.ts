@@ -175,22 +175,6 @@ export const gameRoutes: Record<string, ServerRoute> = {
       const ip = request.info.remoteAddress;
 
       try {
-        // Проверяем, не была ли игра уже удалена
-        if (deletedGames.has(gameId)) {
-          return errorHandler({
-            h,
-            details: 'Игра была завершена. Пожалуйста, начните новую игру.',
-            error: 'Game was deleted',
-            code: 410, // Gone
-            stack: JSON.stringify({
-              gameId,
-              userAgent,
-              ip,
-              timestamp: new Date().toISOString()
-            })
-          });
-        }
-
         // Логируем каждый запрос
         await sendLogToTelegram('📥 Получен запрос на получение состояния игры', {
           gameId,
@@ -205,14 +189,26 @@ export const gameRoutes: Record<string, ServerRoute> = {
           const activeGame = await getActiveGameByGameId(gameId);
 
           if (!activeGame) {
-            // Логируем неудачную попытку получения игры
-            await sendLogToTelegram('❌ Игра не найдена', {
-              gameId,
-              userAgent,
-              ip,
-              timestamp: new Date().toISOString()
-            });
+            // Проверяем, был ли это запрос от фронтенда (polling)
+            const isPolling = userAgent?.includes('Mozilla') || userAgent?.includes('Chrome');
+            
+            if (isPolling) {
+              // Для polling запросов возвращаем специальный код
+              return errorHandler({
+                h,
+                details: 'Игра завершена или не существует. Пожалуйста, начните новую игру.',
+                error: 'Game finished',
+                code: 410,
+                stack: JSON.stringify({
+                  gameId,
+                  userAgent,
+                  ip,
+                  timestamp: new Date().toISOString()
+                })
+              });
+            }
 
+            // Для остальных запросов возвращаем стандартную 404
             return errorHandler({
               h,
               details: 'Кажется мы потеряли данные об игре :(',
