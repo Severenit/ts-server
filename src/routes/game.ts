@@ -67,6 +67,8 @@ function restoreCards(cards: PlayerCard[], boardName: string) {
 
 // Map для хранения состояний игр
 const gameStates = new Map();
+// Set для хранения ID удаленных игр
+const deletedGames = new Set();
 
 interface PlayerCardSettings {
   cardInfo: {
@@ -173,6 +175,22 @@ export const gameRoutes: Record<string, ServerRoute> = {
       const ip = request.info.remoteAddress;
 
       try {
+        // Проверяем, не была ли игра уже удалена
+        if (deletedGames.has(gameId)) {
+          return errorHandler({
+            h,
+            details: 'Игра была завершена. Пожалуйста, начните новую игру.',
+            error: 'Game was deleted',
+            code: 410, // Gone
+            stack: JSON.stringify({
+              gameId,
+              userAgent,
+              ip,
+              timestamp: new Date().toISOString()
+            })
+          });
+        }
+
         // Логируем каждый запрос
         await sendLogToTelegram('📥 Получен запрос на получение состояния игры', {
           gameId,
@@ -1033,20 +1051,22 @@ export const gameRoutes: Record<string, ServerRoute> = {
           if (!activeGame) {
             return h.response({
               error: 'Game not found', details: {
-                gameId, message: 'Game does not exist in memory or database',
-              },
+                gameId, message: 'Game does not exist in memory or database'
+              }
             }).code(404);
           }
         }
 
         // Удаляем игру из памяти
         gameStates.delete(gameId);
+        // Добавляем в список удаленных
+        deletedGames.add(gameId);
 
         // Удаляем игру из базы данных
         await deleteActiveGame(gameId);
 
         return {
-          status: 'success', message: 'Game successfully deleted', gameId,
+          status: 'success', message: 'Game successfully deleted', gameId
         };
       } catch (error) {
         console.error('Error deleting game:', error);
