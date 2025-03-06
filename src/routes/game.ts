@@ -7,6 +7,7 @@ import { errorHandler, sendLogToTelegram } from '../utils/error.js';
 import { GameState, PlayerCard } from '../types/game.js';
 import { Card } from '../game/core/card.js';
 import { addCardToPlayer, deletePlayerCard } from '../keystone-api/user.js';
+import { API_VERSION, MIN_SUPPORTED_VERSION, versionCheck } from '../utils/versionCheck.js';
 
 // Вспомогательная функция для восстановления объектов карт
 function restoreCards(cards: PlayerCard[], boardName: string) {
@@ -83,44 +84,6 @@ const MAINTENANCE_MODE = false;
 
 // Map для отслеживания количества запросов
 const requestCounts = new Map();
-
-// Версия API
-const API_VERSION = '1.0.0';
-const MIN_SUPPORTED_VERSION = '1.0.0';
-
-// Функция проверки версии клиента
-function checkClientVersion(clientVersion: string | undefined): boolean {
-  if (!clientVersion) return false;
-  
-  const [majorClient, minorClient, patchClient] = clientVersion.split('.').map(Number);
-  const [majorMin, minorMin, patchMin] = MIN_SUPPORTED_VERSION.split('.').map(Number);
-  
-  if (majorClient < majorMin) return false;
-  if (majorClient === majorMin && minorClient < minorMin) return false;
-  if (majorClient === majorMin && minorClient === minorMin && patchClient < patchMin) return false;
-  
-  return true;
-}
-
-// Middleware для проверки версии
-function versionCheck(request: any, h: any) {
-  const clientVersion = request.headers['x-client-version'];
-  
-  if (!checkClientVersion(clientVersion)) {
-    return errorHandler({
-      h,
-      details: 'Пожалуйста, обновите приложение до последней версии',
-      error: 'Outdated client version',
-      code: 426, // Upgrade Required
-      meta: {
-        currentVersion: API_VERSION,
-        minSupported: MIN_SUPPORTED_VERSION
-      }
-    });
-  }
-  
-  return null;
-}
 
 // Функция для логирования запросов
 async function logRequest(gameId: string, telegramData: string, request: any) {
@@ -929,11 +892,11 @@ export const gameRoutes: Record<string, ServerRoute> = {
         let exchangeResult;
 
         if (game.winner === 'player') {
-          await sendLogToTelegram('👤 Победил игрок, проверяем возможность обмена карт', {
-            requestedCardId: cardId, availableCards: game.originalAiCards.map((c: Card | null) => ({
-              id: c?.id, name: c?.name, isNull: c === null,
-            })),
-          });
+          // await sendLogToTelegram('👤 Победил игрок, проверяем возможность обмена карт', {
+          //   requestedCardId: cardId, availableCards: game.originalAiCards.map((c: Card | null) => ({
+          //     id: c?.id, name: c?.name, isNull: c === null,
+          //   })),
+          // });
 
           if (!cardId) {
             return errorHandler({

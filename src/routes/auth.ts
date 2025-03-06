@@ -2,12 +2,17 @@ import { Request, ResponseToolkit, ServerRoute } from '@hapi/hapi';
 import { errorHandler } from '../utils/error.js';
 import { validateTelegramData } from '../utils/validateTelegramData.js';
 import { getOrCreatePlayer } from '../keystone-api/user.js';
+import { versionCheck } from '../utils/versionCheck.js';
 
 export const authRoutes: Record<string, ServerRoute> = {
   init: {
     method: 'POST' as const,
     path: '/api/auth',
     handler: async (request: Request, h: ResponseToolkit) => {
+      // Проверяем версию клиента
+const versionError = versionCheck(request, h);
+if (versionError) return versionError;
+
       console.log('📌: \'/api/auth\' Получен запрос на авторизацию');
       try {
         const telegramData = request.headers['telegram-data'];
@@ -57,6 +62,10 @@ export const authRoutes: Record<string, ServerRoute> = {
     method: 'GET',
     path: '/api/users/{telegram_id}',
     handler: async (request, h) => {
+            // Проверяем версию клиента
+            const versionError = versionCheck(request, h);
+            if (versionError) return versionError;
+
       try {
         const { telegram_id } = request.params;
         console.log('📌: \'/api/users/{telegram_id}\' Получение данных пользователя для telegram_id:', telegram_id);
