@@ -8,65 +8,13 @@ import { GameState, PlayerCard } from '../types/game.js';
 import { Card } from '../game/core/card.js';
 import { addCardToPlayer, deletePlayerCard } from '../keystone-api/user.js';
 
-// Вспомогательная функция для восстановления объектов карт
-function restoreCards(cards: PlayerCard[], boardName: string) {
-  console.log('cards', cards);
-  if (!cards) {
-    sendLogToTelegram('Массив карт пустой или не определен');
-    return [];
-  }
-
-  // sendLogToTelegram('🔄 Восстанавливаем карты - ' + boardName, { cards: cards.map(c => c?.id) });
-
-  const deck = Card.createDeck();
-
-  return cards.map(cardData => {
-    // Если это пустая позиция на доске, просто возвращаем null без логирования
-    if (!cardData) {
-      return null;
-    }
-
-    if (!cardData.id) {
-      const message = '⚠️ Card data has no ID';
-      console.log(message, cardData);
-      sendLogToTelegram(message, cardData);
-      return null;
-    }
-
-    const card = deck.find((c: Card) => c.id === cardData.id);
-    if (!card) {
-      const message = `❌ Card ${cardData.id} not found in deck`;
-      console.log(message);
-      sendLogToTelegram(message);
-      return null;
-    }
-
-    try {
-      const restoredCard = card.clone();
-
-      if (!restoredCard) {
-        const message = `❌ Failed to clone card ${card.id}`;
-        console.log(message);
-        sendLogToTelegram(message);
-        return null;
-      }
-
-      restoredCard.owner = cardData.owner;
-      restoredCard.position = cardData.position;
-
-      console.log(`✅ Успешно восстановили карту ${cardData.id}`);
-      return restoredCard;
-    } catch (error) {
-      const message = `❌ Error restoring card ${cardData.id}`;
-      console.error(message, error);
-      sendLogToTelegram(message, { error, cardData });
-      return null;
-    }
-  }).filter((card: Card | null): card is Card => card !== null);
-}
-
 // Map для хранения состояний игр
 const gameStates = new Map();
+// Map для хранения времени последнего запроса для каждого gameId
+const lastRequestTimes = new Map();
+// Минимальный интервал между запросами (2 секунды)
+const MIN_REQUEST_INTERVAL = 2000;
+
 // Set для хранения ID удаленных игр
 const deletedGames = new Set();
 
@@ -173,9 +121,38 @@ export const gameRoutes: Record<string, ServerRoute> = {
       const { gameId } = request.params;
       const userAgent = request.headers['user-agent'];
       const ip = request.info.remoteAddress;
+      const now = Date.now();
 
       try {
-        // Логируем каждый запрос
+        // Проверяем, был ли это запрос от фронтенда (polling)
+        const isPolling = userAgent?.includes('Mozilla') || userAgent?.includes('Chrome');
+        
+        if (isPolling) {
+          const lastRequestTime = lastRequestTimes.get(gameId) || 0;
+          const timeSinceLastRequest = now - lastRequestTime;
+
+          // Если запросы идут слишком часто, возвращаем 429 Too Many Requests
+          if (timeSinceLastRequest < MIN_REQUEST_INTERVAL) {
+            return errorHandler({
+              h,
+              details: 'Слишком много запросов. Пожалуйста, подождите.',
+              error: 'Too Many Requests',
+              code: 429,
+              stack: JSON.stringify({
+                gameId,
+                userAgent,
+                ip,
+                timeSinceLastRequest,
+                timestamp: new Date().toISOString()
+              })
+            });
+          }
+        }
+
+        // Обновляем время последнего запроса
+        lastRequestTimes.set(gameId, now);
+
+        // Логируем каждый запрос, но только если прошла rate limit проверка
         await sendLogToTelegram('📥 Получен запрос на получение состояния игры', {
           gameId,
           userAgent,
@@ -189,9 +166,6 @@ export const gameRoutes: Record<string, ServerRoute> = {
           const activeGame = await getActiveGameByGameId(gameId);
 
           if (!activeGame) {
-            // Проверяем, был ли это запрос от фронтенда (polling)
-            const isPolling = userAgent?.includes('Mozilla') || userAgent?.includes('Chrome');
-            
             if (isPolling) {
               // Для polling запросов возвращаем специальный код
               return errorHandler({
