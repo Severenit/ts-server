@@ -8,6 +8,7 @@ import { GameState, PlayerCard, GamePayload, PlayerMovePayload, ExchangeCardPayl
 import { Card } from '../game/core/card.js';
 import { addCardToPlayer, deletePlayerCard } from '../keystone-api/user.js';
 import { API_VERSION, MIN_SUPPORTED_VERSION, versionCheck } from '../utils/versionCheck.js';
+import { logRequest, nonExistentGames } from '../utils/logRequest.js';
 
 // Вспомогательная функция для восстановления объектов карт
 function restoreCards(cards: PlayerCard[], boardName: string) {
@@ -66,41 +67,8 @@ function restoreCards(cards: PlayerCard[], boardName: string) {
   }).filter((card: Card | null): card is Card => card !== null);
 }
 
-const nonExistentGames = new Set();
-
 // Флаг технического обслуживания
 const MAINTENANCE_MODE = false;
-
-// Map для отслеживания количества запросов
-const requestCounts = new Map();
-
-// Функция для логирования запросов
-async function logRequest(gameId: string, telegramData: string, request: any) {
-  const now = Date.now();
-  const key = `${gameId}_${request.info.remoteAddress}`;
-  const count = (requestCounts.get(key) || 0) + 1;
-  requestCounts.set(key, count);
-
-  if (count > 10) { // Если больше 10 запросов от одного IP к одной игре
-    await sendLogToTelegram('🚨 Подозрительная активность', {
-      gameId,
-      ip: request.info.remoteAddress,
-      userAgent: request.headers['user-agent'],
-      requestCount: count,
-      path: request.path,
-      method: request.method,
-      timestamp: new Date().toISOString(),
-      referer: request.headers.referer || 'unknown',
-      telegramData,
-    });
-
-    // Если игра не существует и запросы продолжаются, добавляем в чёрный список
-    if (nonExistentGames.has(gameId)) {
-      return true; // Сигнализируем о необходимости блокировки запроса
-    }
-  }
-  return false;
-}
 
 export const gameRoutes: Record<string, ServerRoute> = {
   // Получение версии API
