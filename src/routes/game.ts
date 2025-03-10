@@ -336,14 +336,6 @@ export const gameRoutes: Record<string, ServerRoute> = {
           return acc;
         }, []));
 
-        await sendLogToTelegram('Состояние доски перед ходом AI:', {
-          board: game.board,
-          emptyPositions: game.board.reduce((acc, cell, index) => {
-            if (cell === null) acc.push(index);
-            return acc;
-          }, [])
-        });
-
         game.playerHand = restoreCards(savedState.playerHand, 'playerHand');
         game.aiHand = restoreCards(savedState.aiHand, 'aiHand');
         game.originalPlayerCards = savedState.originalPlayerCards

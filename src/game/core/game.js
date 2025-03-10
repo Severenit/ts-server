@@ -367,15 +367,6 @@ export class Game {
 
         // Добавляем информацию об окончании игры
         if (this.gameStatus === 'finished') {
-            // Собираем оригинальные карты из карт на поле
-            const boardPlayerCards = this.board
-                .filter(card => card && card.originalOwner === 'player')
-                .map(card => card.toClientObject(false));
-
-            const boardAiCards = this.board
-                .filter(card => card && card.originalOwner === 'ai')
-                .map(card => card.toClientObject(false));
-
             state.gameEndInfo = {
                 finalScore: {
                     player: this.playerScore,
@@ -388,8 +379,8 @@ export class Game {
                 })),
                 totalRounds: this.suddenDeathRound + 1,
                 originalCards: {
-                    player: boardPlayerCards,
-                    ai: boardAiCards
+                    player: this.originalPlayerCards.map(card => card.toClientObject(false)),
+                    ai: this.originalAiCards.map(card => card.toClientObject(false))
                 }
             };
 
