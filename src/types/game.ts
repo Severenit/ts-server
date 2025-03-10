@@ -20,15 +20,16 @@ export type ElementType = 'EARTH' | 'FIRE' | 'HOLY' | 'ICE' | 'POISON' | 'THUNDE
 export interface AiCard {
   id: string;
   name: string;
-  top?: number;
-  right?: number;
-  bottom?: number;
-  left?: number;
-  element?: null | ElementType;
+  top: number;
+  right: number;
+  bottom: number;
+  left: number;
+  element: ElementType | null;
   imageUrl: string;
   hidden: boolean;
   owner: 'player' | 'ai';
   originalOwner: 'player' | 'ai';
+  position?: number;
 }
 
 export interface PlayerCard {
@@ -60,6 +61,8 @@ export interface GameState {
   winner: 'player' | 'ai' | 'draw' | null;
   originalPlayerCards: Array<PlayerCard>;
   originalAiCards: Array<AiCard>;
+  suddenDeathRound: number;
+  cardExchange?: CardExchangeResult | null;
 }
 
 export interface ActiveGame {

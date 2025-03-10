@@ -7,6 +7,7 @@ import {
 } from '../graphql/game.js';
 import { client } from './index.js';
 import { ActiveGame, GameState } from '../types/game.js';
+import { sendLogToTelegram } from '../utils/error.js';
 
 /**
  * Получение активной игры по её ID
@@ -14,21 +15,27 @@ import { ActiveGame, GameState } from '../types/game.js';
  * @returns {Promise<Object|null>} Информация об игре или null, если игра не найдена
  */
 export async function getActiveGameByGameId(gameId: string) {
+  console.log('🔍 Attempting to get active game:', gameId);
   try {
-    console.log('🎮 Запрашиваем игру из базы данных...');
-    console.log('ID игры:', gameId);
-
-    const data = await client.request<{ activeGame: any }>(GET_ACTIVE_GAME, { gameId });
-
-    if (!data.activeGame) {
-      console.log('🎮 Нет активной игры с ID:', gameId);
-      return null;
-    }
-
-    console.log('🎮 Найдена активная игра:', data.activeGame);
+    console.log('📡 Sending request to Keystone API...');
+    const data = await client.request<{ activeGame: ActiveGame }>(GET_ACTIVE_GAME, {
+      gameId
+    });
+    console.log('✅ Received response:', JSON.stringify(data, null, 2));
     return data.activeGame;
   } catch (error) {
-    console.error('❌ Ошибка получения активной игры:', error);
+    console.error('❌ Error getting active game:', {
+      error,
+      errorMessage: error instanceof Error ? error.message : 'Unknown error',
+      errorStack: error instanceof Error ? error.stack : undefined,
+      gameId,
+      timestamp: new Date().toISOString()
+    });
+    await sendLogToTelegram('❌ Ошибка получения активной игры:', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+      gameId,
+      timestamp: new Date().toISOString()
+    });
     throw error;
   }
 }

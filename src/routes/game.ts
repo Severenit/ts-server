@@ -149,19 +149,19 @@ export const gameRoutes: Record<string, ServerRoute> = {
 
         // Восстанавливаем карты
         if (Array.isArray(savedState.board)) {
-          savedState.board.forEach((card: Card, index: number) => {
+          savedState.board.forEach((card: PlayerCard | null, index: number) => {
             if (card) {
               game.board[index] = restoreCards([{ ...card, hidden: false, owner: card.owner || 'player' }], 'board')[0];
             }
           });
         }
         game.playerHand = restoreCards(savedState.playerHand, 'playerHand');
-        game.aiHand = restoreCards(savedState.aiHand, 'aiHand');
+        game.aiHand = restoreCards(savedState.aiHand as unknown as PlayerCard[], 'aiHand');
         game.originalPlayerCards = savedState.originalPlayerCards 
           ? restoreCards(savedState.originalPlayerCards, 'originalPlayerCards')
           : game.playerHand.map((card: Card) => card.clone());
         game.originalAiCards = savedState.originalAiCards
-          ? restoreCards(savedState.originalAiCards, 'originalAiCards')
+          ? restoreCards(savedState.originalAiCards as unknown as PlayerCard[], 'originalAiCards')
           : game.aiHand.map((card: Card) => card.clone());
 
         // Восстанавливаем остальное состояние
@@ -228,7 +228,7 @@ export const gameRoutes: Record<string, ServerRoute> = {
 
         // Восстанавливаем состояние
         if (Array.isArray(savedState.board)) {
-          savedState.board.forEach((card: Card, index: number) => {
+          savedState.board.forEach((card: PlayerCard | null, index: number) => {
             if (card) {
               game.board[index] = restoreCards([{ ...card, hidden: false }], 'board')[0];
             }
@@ -323,7 +323,7 @@ export const gameRoutes: Record<string, ServerRoute> = {
         // Восстанавливаем состояние
         game.board = Array(9).fill(null); // Инициализируем пустую доску
         if (Array.isArray(savedState.board)) {
-          savedState.board.forEach((card: Card, index: number) => {
+          savedState.board.forEach((card: PlayerCard | null, index: number) => {
             if (card) {
               game.board[index] = restoreCards([{ ...card, hidden: false }], 'board')[0];
             }
@@ -427,7 +427,7 @@ export const gameRoutes: Record<string, ServerRoute> = {
 
       // Восстанавливаем состояние
       if (Array.isArray(savedState.board)) {
-        savedState.board.forEach((card: Card, index: number) => {
+        savedState.board.forEach((card: PlayerCard | null, index: number) => {
           if (card) {
             game.board[index] = restoreCards([{ ...card, hidden: false }], 'board')[0];
           }
@@ -498,7 +498,7 @@ export const gameRoutes: Record<string, ServerRoute> = {
 
       // Восстанавливаем состояние
       if (Array.isArray(savedState.board)) {
-        savedState.board.forEach((card: Card, index: number) => {
+        savedState.board.forEach((card: PlayerCard | null, index: number) => {
           if (card) {
             game.board[index] = restoreCards([{ ...card, hidden: false }], 'board')[0];
           }
