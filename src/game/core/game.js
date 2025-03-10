@@ -312,8 +312,8 @@ export class Game {
      * @returns {boolean} true если игра окончена
      */
     _checkGameEnd() {
-        // Игра заканчивается, когда все карты выложены на поле
-        const isGameEnd = this.board.every(cell => cell !== null);
+        // Игра заканчивается, когда у игроков не осталось карт
+        const isGameEnd = this.playerHand.length === 0 || this.aiHand.length === 0;
         
         if (isGameEnd) {
             if (this.playerScore > this.aiScore) {
