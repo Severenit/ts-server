@@ -4,7 +4,7 @@ import { Game } from '../game/core/game.js';
 
 import { createActiveGame, deleteActiveGame, getActiveGameByGameId, updateUserStats } from '../keystone-api/game.js';
 import { errorHandler, sendLogToTelegram } from '../utils/error.js';
-import { GameState, PlayerCard, GamePayload, PlayerMovePayload, ExchangeCardPayload, UpdateGameStatsPayload } from '../types/game.js';
+import { GameState, PlayerCard, GamePayload, PlayerMovePayload, ExchangeCardPayload, UpdateGameStatsPayload, CardExchangeResult } from '../types/game.js';
 import { Card } from '../game/core/card.js';
 import { addCardToPlayer, deletePlayerCard } from '../keystone-api/user.js';
 import { API_VERSION, MIN_SUPPORTED_VERSION, versionCheck } from '../utils/versionCheck.js';
@@ -561,7 +561,8 @@ export const gameRoutes: Record<string, ServerRoute> = {
 
         // Если обмен уже был выполнен, возвращаем результат последнего обмена
         return {
-          status: 'success', exchange: {
+          status: 'success', 
+          exchange: {
             type: game.cardExchange.type,
             card: game.cardExchange.takenCard.toClientObject(false),
             message: game.cardExchange.message,
@@ -572,7 +573,7 @@ export const gameRoutes: Record<string, ServerRoute> = {
       }
 
       try {
-        let exchangeResult;
+        let exchangeResult: CardExchangeResult;
 
         if (game.winner === 'player') {
           if (!cardId) {
@@ -596,12 +597,6 @@ export const gameRoutes: Record<string, ServerRoute> = {
             });
           }
 
-          console.log('🔍 Проверка карт AI перед обменом:', {
-            requestedCardId: cardId, availableCards: game.originalAiCards.map((c: Card | null) => ({
-              id: c?.id, name: c?.name, isNull: c === null,
-            })),
-          });
-
           // Создаем новую колоду для сравнения
           const deck = Card.createDeck();
           const deckCard = deck.find(c => c.id === cardId);
@@ -617,13 +612,8 @@ export const gameRoutes: Record<string, ServerRoute> = {
 
           // Проверяем наличие карты в оригинальных картах AI
           const selectedCard = game.originalAiCards.find((card: Card | null) => {
-            if (!card) {
-              console.log('⚠️ Found null card in originalAiCards');
-              return false;
-            }
-            const isMatch = card.id === cardId;
-            console.log(`🔍 Сравниваем карту ${card.id} с запрошенной ${cardId}: ${isMatch}`);
-            return isMatch;
+            if (!card) return false;
+            return card.id === cardId;
           });
 
           if (!selectedCard) {
@@ -648,7 +638,9 @@ export const gameRoutes: Record<string, ServerRoute> = {
           clonedCard.position = selectedCard.position;
 
           exchangeResult = {
-            type: 'player_win', takenCard: clonedCard, message: `Вы забрали карту ${selectedCard.name}!`,
+            type: 'player_win',
+            takenCard: clonedCard,
+            message: `Вы забрали карту ${selectedCard.name}!`,
           };
         } else {
           if (!game.getCardExchange || typeof game.getCardExchange !== 'function') {
@@ -657,19 +649,19 @@ export const gameRoutes: Record<string, ServerRoute> = {
             });
           }
 
-          exchangeResult = game.getCardExchange();
-          // Проверяем результат обмена
-          if (!exchangeResult || !exchangeResult.takenCard) {
+          const aiExchangeResult = game.getCardExchange();
+          
+          if (!aiExchangeResult || !aiExchangeResult.takenCard) {
             return errorHandler({
               h, details: 'Invalid exchange result', error: 'Failed to perform card exchange', code: 500,
             });
           }
-        }
 
-        if (!exchangeResult) {
-          return errorHandler({
-            h, details: 'Не удалось выполнить обмен картами', error: 'Результат обмена не определен', code: 400,
-          });
+          exchangeResult = {
+            type: 'ai_win',
+            takenCard: aiExchangeResult.takenCard,
+            message: aiExchangeResult.message
+          };
         }
 
         game.cardExchange = exchangeResult;
@@ -703,7 +695,8 @@ export const gameRoutes: Record<string, ServerRoute> = {
         }
 
         return {
-          status: 'success', exchange: {
+          status: 'success',
+          exchange: {
             type: exchangeResult.type,
             card: exchangeResult.takenCard.toClientObject(false),
             message: exchangeResult.message,

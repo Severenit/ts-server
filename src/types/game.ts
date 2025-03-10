@@ -98,3 +98,9 @@ export interface UpdateGameStatsPayload {
   wonCards: string[];
   lostCards: string[];
 }
+
+export interface CardExchangeResult {
+  type: 'player_win' | 'ai_win';
+  takenCard: Card;
+  message: string;
+}
