@@ -66,17 +66,7 @@ function restoreCards(cards: PlayerCard[], boardName: string) {
   }).filter((card: Card | null): card is Card => card !== null);
 }
 
-// Оставляем только важные переменные
-const MIN_REQUEST_INTERVAL = 2000;
 const nonExistentGames = new Set();
-const MAINTENANCE_MODE = false;
-const requestCounts = new Map();
-
-// Map для хранения времени последнего запроса для каждого gameId
-const lastRequestTimes = new Map();
-
-// Set для хранения ID удаленных игр
-const deletedGames = new Set();
 
 // Флаг технического обслуживания
 const MAINTENANCE_MODE = false;
@@ -416,174 +406,80 @@ export const gameRoutes: Record<string, ServerRoute> = {
     method: 'GET' as const,
     path: '/api/game/{gameId}/ai-move',
     handler: async (request, h) => {
-      // Проверяем версию клиента
       const versionError = versionCheck(request, h);
       if (versionError) return versionError;
 
       const { gameId } = request.params;
 
       try {
-        let game = gameStates.get(gameId);
+        const activeGame = await getActiveGameByGameId(gameId);
 
-        if (!game) {
-          // await sendLogToTelegram('🔄 Восстанавливаем игру из БД (ход AI)', { gameId });
-          // Пытаемся восстановить игру из базы данных
-          const activeGame = await getActiveGameByGameId(gameId);
-
-          if (!activeGame) {
-            return errorHandler({
-              h,
-              details: 'Кажется мы потеряли данные об игре :(',
-              stack: JSON.stringify({
-                gameId,
-                availableGames: Array.from(gameStates.keys()),
-              }),
-              error: 'Game not found', code: 404,
-            });
-          }
-
-          // Восстанавливаем состояние игры
-          const savedState = activeGame.gameState;
-          game = new Game(savedState.settings || {}, savedState.rules || {});
-
-          // Проверяем и восстанавливаем доску
-          if (!Array.isArray(savedState.board)) {
-            await sendLogToTelegram('⚠️ Доска в сохраненном состоянии не является массивом', {
-              board: savedState.board, type: typeof savedState.board,
-            });
-            game.board = Array(9).fill(null);
-          } else if (savedState.board.length !== 9) {
-            await sendLogToTelegram('⚠️ Некорректная длина доски', {
-              length: savedState.board.length,
-            });
-            game.board = Array(9).fill(null);
-          } else {
-            // Восстанавливаем карты на доске
-            const restoredBoard = restoreCards(savedState.board, 'restoredBoard');
-            game.board = Array(9).fill(null);
-            // Копируем только валидные карты, сохраняя null для пустых позиций
-            savedState.board.forEach((card: Card | null, index: number) => {
-              if (card) {
-                game.board[index] = restoredBoard.find(c => c.id === card.id) || null;
-              }
-            });
-
-            // await sendLogToTelegram('✅ Восстановлена доска', {
-            //     board: game.board.map((card: Card | null) => card ? { id: card.id, name: card.name } : null)
-            // });
-          }
-
-          // Восстанавливаем карты с проверкой на null
-          game.playerHand = restoreCards(savedState.playerHand, 'playerHand');
-          game.aiHand = restoreCards(savedState.aiHand, 'aiHand');
-
-          // Особое внимание к восстановлению оригинальных карт
-          if (savedState.originalPlayerCards && savedState.originalAiCards) {
-            game.originalPlayerCards = restoreCards(savedState.originalPlayerCards, 'originalPlayerCards');
-            game.originalAiCards = restoreCards(savedState.originalAiCards, 'originalAiCards');
-          } else {
-            // Если оригинальных карт нет, копируем из начальных рук
-            game.originalPlayerCards = game.playerHand.map((card: Card) => card.clone());
-            game.originalAiCards = game.aiHand.map((card: Card) => card.clone());
-          }
-
-          // Восстанавливаем остальное состояние
-          await sendLogToTelegram('🔄 Восстанавливаем currentTurn', {
-            savedTurn: savedState.currentTurn, defaultTurn: 'player',
+        if (!activeGame) {
+          return errorHandler({
+            h,
+            details: 'Игра не найдена',
+            error: 'Game not found',
+            code: 404
           });
-          game.currentTurn = savedState.currentTurn || 'player';
-          game.playerScore = savedState.playerScore || 5;
-          game.aiScore = savedState.aiScore || 5;
-          game.gameStatus = savedState.gameStatus || 'playing';
-          game.winner = savedState.winner || null;
-          game.suddenDeathRound = savedState.suddenDeathRound || 0;
-          game.boardElements = Array.isArray(savedState.boardElements) ? savedState.boardElements : Array(9).fill(null);
-          game.cardExchange = savedState.cardExchange || null;
-
-          // Проверяем состояние перед сохранением
-          const validationState = {
-            board: {
-              isArray: Array.isArray(game.board), length: game.board?.length, content: game.board,
-            }, aiHand: {
-              isArray: Array.isArray(game.aiHand),
-              length: game.aiHand?.length,
-              cards: game.aiHand?.map((c: Card | null) => c?.id),
-            }, currentTurn: game.currentTurn,
-          };
-
-          await sendLogToTelegram('🔍 Валидация состояния игры перед сохранением', validationState);
-
-          if (!Array.isArray(game.board) || game.board.length !== 9) {
-            await sendLogToTelegram('❌ Критическая ошибка: некорректная доска после восстановления');
-            return errorHandler({
-              h, details: 'Invalid board state after restoration', error: 'Game state error', code: 500,
-            });
-          }
-
-          // Сохраняем восстановленное состояние
-          gameStates.set(gameId, game);
         }
+
+        const savedState = activeGame.gameState;
+        const game = new Game(savedState.settings || {}, savedState.rules || {});
+
+        // Восстанавливаем состояние
+        game.board = restoreCards(savedState.board, 'board');
+        game.playerHand = restoreCards(savedState.playerHand, 'playerHand');
+        game.aiHand = restoreCards(savedState.aiHand, 'aiHand');
+        game.originalPlayerCards = savedState.originalPlayerCards
+          ? restoreCards(savedState.originalPlayerCards, 'originalPlayerCards')
+          : game.playerHand.map((card: Card) => card.clone());
+        game.originalAiCards = savedState.originalAiCards
+          ? restoreCards(savedState.originalAiCards, 'originalAiCards')
+          : game.aiHand.map((card: Card) => card.clone());
+
+        game.currentTurn = savedState.currentTurn || 'player';
+        game.playerScore = savedState.playerScore || 5;
+        game.aiScore = savedState.aiScore || 5;
+        game.gameStatus = savedState.gameStatus || 'playing';
+        game.winner = savedState.winner || null;
+        game.suddenDeathRound = savedState.suddenDeathRound || 0;
+        game.boardElements = Array.isArray(savedState.boardElements)
+          ? savedState.boardElements
+          : Array(9).fill(null);
+        game.cardExchange = savedState.cardExchange || null;
 
         if (game.currentTurn !== 'ai') {
           return h.response({
-            error: 'Not AI\'s turn', details: {
+            error: 'Not AI\'s turn',
+            details: {
               currentTurn: game.currentTurn,
             },
           }).code(400);
         }
 
-        // Проверяем состояние перед ходом AI
-        const gameStateBeforeMove = {
-          board: {
-            isArray: Array.isArray(game.board),
-            length: game.board.length,
-            content: game.board,
-            nullPositions: game.board
-              .map((cell: Card | null, index: number) => ({ pos: index, isEmpty: cell === null }))
-              .filter((pos: { pos: number; isEmpty: boolean }) => pos.isEmpty)
-              .map((pos: { pos: number }) => pos.pos),
-          }, aiHand: {
-            length: game.aiHand?.length, cards: game.aiHand?.map((c: Card | null) => c?.id),
-          }, currentTurn: game.currentTurn,
-        };
-        // TODO: Turn on logging
-        //await sendLogToTelegram('🎮 Подробное состояние перед ходом AI', gameStateBeforeMove);
-
-        // if (gameStateBeforeMove.board.nullPositions.length === 0) {
-        //     await sendLogToTelegram('❌ Нет доступных позиций для хода', gameStateBeforeMove);
-        //     return errorHandler({
-        //         h,
-        //         details: 'No available positions for move',
-        //         error: 'Game state error',
-        //         code: 400
-        //     });
-        // }
-
         if (!game.aiHand || game.aiHand.length === 0) {
           await sendLogToTelegram('❌ Рука AI пуста', game.aiHand);
           return errorHandler({
-            h, details: 'AI has no cards', error: 'Game state error', code: 400,
+            h,
+            details: 'AI has no cards',
+            error: 'Game state error',
+            code: 400,
           });
         }
 
         try {
           const result = game.makeAIMove();
-          // // Логируем результат хода
-          // await sendLogToTelegram('✅ Ход AI выполнен', {
-          //     moveResult: result,
-          //     newBoardState: game.board?.map((c: Card | null) => c?.id),
-          //     remainingAiCards: game.aiHand?.map((c: Card | null) => c?.id)
-          // });
-
-          // Обновляем состояние в базе данных
           await createActiveGame(game.settings.userId, gameId, game.getState());
 
           return {
-            status: 'move completed', gameState: game.getState(), moveResult: result,
+            status: 'move completed',
+            gameState: game.getState(),
+            moveResult: result,
           };
         } catch (error) {
           await sendLogToTelegram('❌ Ошибка при выполнении хода AI', {
-            error: error instanceof Error ? error.message : 'Unknown error', gameState: game.getState(),
+            error: error instanceof Error ? error.message : 'Unknown error',
+            gameState: game.getState(),
           });
           throw error;
         }
@@ -602,28 +498,61 @@ export const gameRoutes: Record<string, ServerRoute> = {
 
   // Получение доступных карт AI для обмена
   getAvailableCards: {
-    method: 'GET' as const, path: '/api/game/{gameId}/available-cards', handler: (request, h) => {
+    method: 'GET' as const,
+    path: '/api/game/{gameId}/available-cards',
+    handler: async (request, h) => {
       const { gameId } = request.params;
-      const game = gameStates.get(gameId);
+      
+      const activeGame = await getActiveGameByGameId(gameId);
 
-      if (!game) {
-        return h.response({
-          error: 'Game not found', details: {
-            gameId, availableGames: Array.from(gameStates.keys()),
-          },
-        }).code(404);
+      if (!activeGame) {
+        return errorHandler({
+          h,
+          details: 'Игра не найдена',
+          error: 'Game not found',
+          code: 404
+        });
       }
+
+      const savedState = activeGame.gameState;
+      const game = new Game(savedState.settings || {}, savedState.rules || {});
+
+      // Восстанавливаем состояние
+      game.board = restoreCards(savedState.board, 'board');
+      game.playerHand = restoreCards(savedState.playerHand, 'playerHand');
+      game.aiHand = restoreCards(savedState.aiHand, 'aiHand');
+      game.originalPlayerCards = savedState.originalPlayerCards
+        ? restoreCards(savedState.originalPlayerCards, 'originalPlayerCards')
+        : game.playerHand.map((card: Card) => card.clone());
+      game.originalAiCards = savedState.originalAiCards
+        ? restoreCards(savedState.originalAiCards, 'originalAiCards')
+        : game.aiHand.map((card: Card) => card.clone());
+
+      game.currentTurn = savedState.currentTurn || 'player';
+      game.playerScore = savedState.playerScore || 5;
+      game.aiScore = savedState.aiScore || 5;
+      game.gameStatus = savedState.gameStatus || 'playing';
+      game.winner = savedState.winner || null;
+      game.suddenDeathRound = savedState.suddenDeathRound || 0;
+      game.boardElements = Array.isArray(savedState.boardElements)
+        ? savedState.boardElements
+        : Array(9).fill(null);
+      game.cardExchange = savedState.cardExchange || null;
 
       if (game.gameStatus !== 'finished' || game.winner !== 'player' || game.cardExchange) {
         return h.response({
-          error: 'Cards are only available for winner player before exchange', details: {
-            gameStatus: game.gameStatus, winner: game.winner, exchangePerformed: !!game.cardExchange,
+          error: 'Cards are only available for winner player before exchange',
+          details: {
+            gameStatus: game.gameStatus,
+            winner: game.winner,
+            exchangePerformed: !!game.cardExchange,
           },
         }).code(400);
       }
 
       return {
-        status: 'success', cards: game.originalAiCards.map((card: Card) => card.toClientObject(false)),
+        status: 'success',
+        cards: game.originalAiCards.map((card: Card) => card.toClientObject(false)),
       };
     },
   },
@@ -633,97 +562,47 @@ export const gameRoutes: Record<string, ServerRoute> = {
     method: 'POST' as const,
     path: '/api/game/{gameId}/exchange-card',
     handler: async (request, h) => {
-      // Проверяем версию клиента
       const versionError = versionCheck(request, h);
       if (versionError) return versionError;
 
-      console.log('📌: Производим обмен картами');
-      // await sendLogToTelegram('📌 Начинаем процесс обмена картами');
-
       const { gameId } = request.params;
       const { cardId } = request.payload as ExchangeCardPayload || {};
-      let game = gameStates.get(gameId);
 
-      if (!game) {
-        await sendLogToTelegram('🔄 Игра не найдена в памяти, пытаемся восстановить из БД', { gameId });
-        // Пытаемся восстановить игру из базы данных
-        const activeGame = await getActiveGameByGameId(gameId);
-        if (!activeGame) {
-          return errorHandler({
-            h,
-            details: 'Кажется мы потеряли данные об игре :(',
-            stack: JSON.stringify({
-              gameId,
-              availableGames: Array.from(gameStates.keys()),
-            }),
-            error: 'Game not found', code: 404,
-          });
-        }
+      const activeGame = await getActiveGameByGameId(gameId);
 
-        // Восстанавливаем состояние игры
-        const savedState = activeGame.gameState;
-        game = new Game(savedState.settings || {}, savedState.rules || {});
-
-        // Восстанавливаем карты
-        console.log('🔄 Начинаем восстановление карт');
-        game.board = restoreCards(savedState.board, 'board');
-        game.playerHand = restoreCards(savedState.playerHand, 'playerHand');
-        game.aiHand = restoreCards(savedState.aiHand, 'aiHand');
-
-        // Особое внимание к восстановлению оригинальных карт
-        if (savedState.originalPlayerCards && Array.isArray(savedState.originalPlayerCards)) {
-          game.originalPlayerCards = restoreCards(savedState.originalPlayerCards, 'originalPlayerCards');
-        } else {
-          console.log('⚠️ originalPlayerCards не найдены, копируем из playerHand');
-          game.originalPlayerCards = game.playerHand.map((card: Card) => card.clone());
-        }
-
-        if (savedState.originalAiCards && Array.isArray(savedState.originalAiCards)) {
-          game.originalAiCards = restoreCards(savedState.originalAiCards, 'originalAiCards');
-          await sendLogToTelegram('✅ Восстановлены оригинальные карты AI', {
-            count: game.originalAiCards.length,
-            cards: game.originalAiCards.map((c: Card) => ({ id: c.id, name: c.name })),
-          });
-        } else {
-          console.log('⚠️ originalAiCards не найдены, копируем из aiHand');
-          game.originalAiCards = game.aiHand.map((card: Card) => card.clone());
-          await sendLogToTelegram('⚠️ Использованы карты из текущей руки AI как оригинальные', {
-            count: game.originalAiCards.length,
-            cards: game.originalAiCards.map((c: Card) => ({ id: c.id, name: c.name })),
-          });
-        }
-
-        // Проверяем восстановление карт
-        const cardsState = {
-          board: {
-            length: game.board?.length, cards: game.board?.map((c: Card | null) => c?.id),
-          }, playerHand: {
-            length: game.playerHand?.length, cards: game.playerHand?.map((c: Card | null) => c?.id),
-          }, aiHand: {
-            length: game.aiHand?.length, cards: game.aiHand?.map((c: Card | null) => c?.id),
-          }, originalPlayerCards: {
-            length: game.originalPlayerCards?.length, cards: game.originalPlayerCards?.map((c: Card | null) => c?.id),
-          }, originalAiCards: {
-            length: game.originalAiCards?.length, cards: game.originalAiCards?.map((c: Card | null) => c?.id),
-          },
-        };
-
-        console.log('🔍 Детальная проверка восстановленных карт:', cardsState);
-        // await sendLogToTelegram('🔍 Состояние карт после восстановления', cardsState);
-
-        // Восстанавливаем остальное состояние
-        game.currentTurn = savedState.currentTurn;
-        game.playerScore = savedState.playerScore;
-        game.aiScore = savedState.aiScore;
-        game.gameStatus = savedState.gameStatus;
-        game.winner = savedState.winner;
-        game.suddenDeathRound = savedState.suddenDeathRound || 0;
-        game.boardElements = savedState.boardElements;
-        game.cardExchange = savedState.cardExchange;
-
-        // Сохраняем восстановленное состояние в память
-        gameStates.set(gameId, game);
+      if (!activeGame) {
+        return errorHandler({
+          h,
+          details: 'Игра не найдена',
+          error: 'Game not found',
+          code: 404
+        });
       }
+
+      const savedState = activeGame.gameState;
+      const game = new Game(savedState.settings || {}, savedState.rules || {});
+
+      // Восстанавливаем состояние
+      game.board = restoreCards(savedState.board, 'board');
+      game.playerHand = restoreCards(savedState.playerHand, 'playerHand');
+      game.aiHand = restoreCards(savedState.aiHand, 'aiHand');
+      game.originalPlayerCards = savedState.originalPlayerCards
+        ? restoreCards(savedState.originalPlayerCards, 'originalPlayerCards')
+        : game.playerHand.map((card: Card) => card.clone());
+      game.originalAiCards = savedState.originalAiCards
+        ? restoreCards(savedState.originalAiCards, 'originalAiCards')
+        : game.aiHand.map((card: Card) => card.clone());
+
+      game.currentTurn = savedState.currentTurn || 'player';
+      game.playerScore = savedState.playerScore || 5;
+      game.aiScore = savedState.aiScore || 5;
+      game.gameStatus = savedState.gameStatus || 'playing';
+      game.winner = savedState.winner || null;
+      game.suddenDeathRound = savedState.suddenDeathRound || 0;
+      game.boardElements = Array.isArray(savedState.boardElements)
+        ? savedState.boardElements
+        : Array(9).fill(null);
+      game.cardExchange = savedState.cardExchange || null;
 
       if (game.gameStatus !== 'finished' || game.winner === 'draw') {
         return errorHandler({
@@ -758,12 +637,6 @@ export const gameRoutes: Record<string, ServerRoute> = {
         let exchangeResult;
 
         if (game.winner === 'player') {
-          // await sendLogToTelegram('👤 Победил игрок, проверяем возможность обмена карт', {
-          //   requestedCardId: cardId, availableCards: game.originalAiCards.map((c: Card | null) => ({
-          //     id: c?.id, name: c?.name, isNull: c === null,
-          //   })),
-          // });
-
           if (!cardId) {
             return errorHandler({
               h,
