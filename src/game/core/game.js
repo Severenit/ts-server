@@ -681,18 +681,43 @@ export class Game {
     _calculateBestMove() {
         let bestScore = -Infinity;
         let bestMove = null;
+        let hasValidMoves = false;
+
+        // Проверяем наличие свободных позиций
+        const emptyPositions = this.board.reduce((acc, cell, index) => {
+            if (cell === null) acc.push(index);
+            return acc;
+        }, []);
+
+        if (emptyPositions.length === 0) {
+            throw new Error('Нет свободных позиций на поле');
+        }
+
+        if (this.aiHand.length === 0) {
+            throw new Error('У AI нет карт в руке');
+        }
 
         // Перебираем все возможные ходы
         for (let cardIndex = 0; cardIndex < this.aiHand.length; cardIndex++) {
-            for (let position = 0; position < 9; position++) {
-                if (this.board[position] === null) {
-                    const score = this._evaluateMove(this.aiHand[cardIndex], position);
-                    if (score > bestScore) {
-                        bestScore = score;
-                        bestMove = { cardIndex, position };
-                    }
+            for (const position of emptyPositions) {
+                hasValidMoves = true;
+                const score = this._evaluateMove(this.aiHand[cardIndex], position);
+                if (score > bestScore) {
+                    bestScore = score;
+                    bestMove = { cardIndex, position };
                 }
             }
+        }
+
+        // Если нет лучшего хода, но есть валидные ходы - выбираем случайный
+        if (!bestMove && hasValidMoves) {
+            const randomCardIndex = Math.floor(Math.random() * this.aiHand.length);
+            const randomPosition = emptyPositions[Math.floor(Math.random() * emptyPositions.length)];
+            bestMove = { cardIndex: randomCardIndex, position: randomPosition };
+        }
+
+        if (!bestMove) {
+            throw new Error('Нет доступных ходов');
         }
 
         return bestMove;
