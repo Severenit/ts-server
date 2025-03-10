@@ -4,7 +4,7 @@ import { Game } from '../game/core/game.js';
 
 import { createActiveGame, deleteActiveGame, getActiveGameByGameId, updateUserStats } from '../keystone-api/game.js';
 import { errorHandler, sendLogToTelegram } from '../utils/error.js';
-import { GameState, PlayerCard } from '../types/game.js';
+import { GameState, PlayerCard, GamePayload, PlayerMovePayload, ExchangeCardPayload, UpdateGameStatsPayload } from '../types/game.js';
 import { Card } from '../game/core/card.js';
 import { addCardToPlayer, deletePlayerCard } from '../keystone-api/user.js';
 import { API_VERSION, MIN_SUPPORTED_VERSION, versionCheck } from '../utils/versionCheck.js';
@@ -100,36 +100,6 @@ async function logRequest(gameId: string, telegramData: string, request: any) {
     }
   }
   return false;
-}
-
-interface PlayerCardSettings {
-  cardInfo: {
-    id: string;
-  };
-}
-
-interface GamePayload {
-  level: number;
-  settings: {
-    userId: string; playerCards?: Array<PlayerCardSettings>;
-  };
-}
-
-interface PlayerMovePayload {
-  cardIndex: number;
-  position: number;
-}
-
-interface ExchangeCardPayload {
-  cardId: string;
-}
-
-interface UpdateGameStatsPayload {
-  statsId: string;
-  isWin: boolean;
-  isDraw: boolean;
-  wonCards: string[];
-  lostCards: string[];
 }
 
 export const gameRoutes: Record<string, ServerRoute> = {

@@ -67,3 +67,34 @@ export interface ActiveGame {
   gameId: string;
   gameState: GameState;
 }
+
+export interface PlayerCardSettings {
+  cardInfo: {
+    id: string;
+  };
+}
+
+export interface GamePayload {
+  level: number;
+  settings: {
+    userId: string;
+    playerCards?: Array<PlayerCardSettings>;
+  };
+}
+
+export interface PlayerMovePayload {
+  cardIndex: number;
+  position: number;
+}
+
+export interface ExchangeCardPayload {
+  cardId: string;
+}
+
+export interface UpdateGameStatsPayload {
+  statsId: string;
+  isWin: boolean;
+  isDraw: boolean;
+  wonCards: string[];
+  lostCards: string[];
+}
