@@ -228,7 +228,7 @@ export const gameRoutes: Record<string, ServerRoute> = {
 
         // Восстанавливаем состояние
         if (Array.isArray(savedState.board)) {
-          savedState.board.forEach((card, index) => {
+          savedState.board.forEach((card: Card, index: number) => {
             if (card) {
               game.board[index] = restoreCards([{ ...card, hidden: false }], 'board')[0];
             }
@@ -336,6 +336,14 @@ export const gameRoutes: Record<string, ServerRoute> = {
           return acc;
         }, []));
 
+        await sendLogToTelegram('Состояние доски перед ходом AI:', {
+          board: game.board,
+          emptyPositions: game.board.reduce((acc, cell, index) => {
+            if (cell === null) acc.push(index);
+            return acc;
+          }, [])
+        });
+
         game.playerHand = restoreCards(savedState.playerHand, 'playerHand');
         game.aiHand = restoreCards(savedState.aiHand, 'aiHand');
         game.originalPlayerCards = savedState.originalPlayerCards
@@ -427,7 +435,7 @@ export const gameRoutes: Record<string, ServerRoute> = {
 
       // Восстанавливаем состояние
       if (Array.isArray(savedState.board)) {
-        savedState.board.forEach((card, index) => {
+        savedState.board.forEach((card: Card, index: number) => {
           if (card) {
             game.board[index] = restoreCards([{ ...card, hidden: false }], 'board')[0];
           }
@@ -498,7 +506,7 @@ export const gameRoutes: Record<string, ServerRoute> = {
 
       // Восстанавливаем состояние
       if (Array.isArray(savedState.board)) {
-        savedState.board.forEach((card, index) => {
+        savedState.board.forEach((card: Card, index: number) => {
           if (card) {
             game.board[index] = restoreCards([{ ...card, hidden: false }], 'board')[0];
           }
