@@ -649,7 +649,7 @@ export const gameRoutes: Record<string, ServerRoute> = {
             });
           }
 
-          const aiExchangeResult = game.getCardExchange();
+          const aiExchangeResult = game.getCardExchange() as CardExchangeResult;
           
           if (!aiExchangeResult || !aiExchangeResult.takenCard) {
             return errorHandler({
