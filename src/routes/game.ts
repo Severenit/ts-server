@@ -309,7 +309,21 @@ export const gameRoutes: Record<string, ServerRoute> = {
         const game = new Game(savedState.settings || {}, savedState.rules || {});
 
         // Восстанавливаем состояние
-        game.board = restoreCards(savedState.board, 'board');
+        game.board = Array(9).fill(null); // Инициализируем пустую доску
+        if (Array.isArray(savedState.board)) {
+          savedState.board.forEach((card, index) => {
+            if (card) {
+              game.board[index] = restoreCards([card], 'board')[0];
+            }
+          });
+        }
+
+        console.log('Board state:', game.board);
+        console.log('Empty positions:', game.board.reduce((acc, cell, index) => {
+          if (cell === null) acc.push(index);
+          return acc;
+        }, []));
+
         game.playerHand = restoreCards(savedState.playerHand, 'playerHand');
         game.aiHand = restoreCards(savedState.aiHand, 'aiHand');
         game.originalPlayerCards = savedState.originalPlayerCards
