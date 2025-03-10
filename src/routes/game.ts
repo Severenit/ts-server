@@ -148,7 +148,13 @@ export const gameRoutes: Record<string, ServerRoute> = {
         const game = new Game(savedState.settings || {}, savedState.rules || {});
 
         // Восстанавливаем карты
-        game.board = restoreCards(savedState.board, 'board');
+        if (Array.isArray(savedState.board)) {
+          savedState.board.forEach((card: Card, index: number) => {
+            if (card) {
+              game.board[index] = restoreCards([{ ...card, hidden: false, owner: card.owner || 'player' }], 'board')[0];
+            }
+          });
+        }
         game.playerHand = restoreCards(savedState.playerHand, 'playerHand');
         game.aiHand = restoreCards(savedState.aiHand, 'aiHand');
         game.originalPlayerCards = savedState.originalPlayerCards 
@@ -221,7 +227,13 @@ export const gameRoutes: Record<string, ServerRoute> = {
         const game = new Game(savedState.settings || {}, savedState.rules || {});
 
         // Восстанавливаем состояние
-        game.board = restoreCards(savedState.board, 'board');
+        if (Array.isArray(savedState.board)) {
+          savedState.board.forEach((card, index) => {
+            if (card) {
+              game.board[index] = restoreCards([{ ...card, hidden: false }], 'board')[0];
+            }
+          });
+        }
         game.playerHand = restoreCards(savedState.playerHand, 'playerHand');
         game.aiHand = restoreCards(savedState.aiHand, 'aiHand');
         game.originalPlayerCards = savedState.originalPlayerCards
@@ -311,9 +323,9 @@ export const gameRoutes: Record<string, ServerRoute> = {
         // Восстанавливаем состояние
         game.board = Array(9).fill(null); // Инициализируем пустую доску
         if (Array.isArray(savedState.board)) {
-          savedState.board.forEach((card, index) => {
+          savedState.board.forEach((card: Card, index: number) => {
             if (card) {
-              game.board[index] = restoreCards([card], 'board')[0];
+              game.board[index] = restoreCards([{ ...card, hidden: false }], 'board')[0];
             }
           });
         }
@@ -414,7 +426,13 @@ export const gameRoutes: Record<string, ServerRoute> = {
       const game = new Game(savedState.settings || {}, savedState.rules || {});
 
       // Восстанавливаем состояние
-      game.board = restoreCards(savedState.board, 'board');
+      if (Array.isArray(savedState.board)) {
+        savedState.board.forEach((card, index) => {
+          if (card) {
+            game.board[index] = restoreCards([{ ...card, hidden: false }], 'board')[0];
+          }
+        });
+      }
       game.playerHand = restoreCards(savedState.playerHand, 'playerHand');
       game.aiHand = restoreCards(savedState.aiHand, 'aiHand');
       game.originalPlayerCards = savedState.originalPlayerCards
@@ -479,7 +497,13 @@ export const gameRoutes: Record<string, ServerRoute> = {
       const game = new Game(savedState.settings || {}, savedState.rules || {});
 
       // Восстанавливаем состояние
-      game.board = restoreCards(savedState.board, 'board');
+      if (Array.isArray(savedState.board)) {
+        savedState.board.forEach((card, index) => {
+          if (card) {
+            game.board[index] = restoreCards([{ ...card, hidden: false }], 'board')[0];
+          }
+        });
+      }
       game.playerHand = restoreCards(savedState.playerHand, 'playerHand');
       game.aiHand = restoreCards(savedState.aiHand, 'aiHand');
       game.originalPlayerCards = savedState.originalPlayerCards
