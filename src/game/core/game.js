@@ -344,7 +344,28 @@ export class Game {
         const state = {
             settings: this.settings,
             rules: this.rules,
-            board: this.board.map(card => card ? card.toClientObject(false) : null),
+            board: this.board.map((card, index) => {
+                if (!card) return null;
+                const cardObj = card.toClientObject(false);
+                
+                // Добавляем информацию о бонусах для карт на поле
+                if (this.rules.ELEMENTAL && this.boardElements[index]) {
+                    cardObj.elementalBonus = {
+                        element: this.boardElements[index],
+                        bonus: card.element === this.boardElements[index] ? 1 : -1
+                    };
+                }
+
+                // Добавляем информацию о специальных правилах
+                cardObj.specialRules = {
+                    same: false,    // Карта захвачена по правилу Same
+                    plus: false,    // Карта захвачена по правилу Plus
+                    combo: false,   // Карта захвачена по комбо Same+Plus
+                    wasUsedInRule: false  // Карта участвовала в правиле (например, её значение использовалось для Plus)
+                };
+
+                return cardObj;
+            }),
             boardElements: this.boardElements,
             playerHand: this.playerHand.map(card => card.toClientObject(false)),
             aiHand: this.aiHand.map(card => card.toClientObject(!this.rules.OPEN)),
@@ -448,6 +469,8 @@ export class Game {
                 card: card.toClientObject(false)
             })),
             captureDirections: captureResult.captureDirections,
+            specialRules: captureResult.specialRules,
+            elementalBonuses: captureResult.elementalBonuses,
             isGameEnd,
             gameEndInfo: isGameEnd ? {
                 winner: this.winner,
@@ -504,6 +527,8 @@ export class Game {
                 card: card.toClientObject(false)
             })),
             captureDirections: captureResult.captureDirections,
+            specialRules: captureResult.specialRules,
+            elementalBonuses: captureResult.elementalBonuses,
             isGameEnd,
             gameEndInfo: isGameEnd ? {
                 winner: this.winner,
@@ -522,22 +547,141 @@ export class Game {
     _placeCard(card, position, player) {
         const capturedCards = [];
         const captureDirections = [];
+        const specialRules = {
+            same: false,
+            plus: false,
+            combo: false
+        };
+        
+        // Добавляем информацию об элементальных бонусах
+        const elementalBonuses = {
+            placedCard: {
+                element: null,
+                bonus: 0
+            },
+            capturedCards: []
+        };
         
         // Устанавливаем владельца карты
         card.setOwner(player);
         this.board[position] = card;
 
+        // Проверяем элементальный бонус для размещенной карты
+        if (this.rules.ELEMENTAL && this.boardElements[position]) {
+            elementalBonuses.placedCard = {
+                element: this.boardElements[position],
+                bonus: card.element === this.boardElements[position] ? 1 : -1
+            };
+        }
+
         // Проверяем соседние карты для захвата
         const adjacentPositions = this._getAdjacentPositions(position);
+        
+        // Собираем значения для правила PLUS
+        const adjacentValues = [];
+        
+        // Собираем карты для правила SAME
+        const sameValueCards = new Map();
+
         for (const [adjPos, direction] of adjacentPositions) {
             const adjCard = this.board[adjPos];
             if (adjCard && adjCard.owner !== player) {
+                const attackValue = card.getValue(direction);
+                const defendValue = adjCard.getValue(this._getOppositeDirection(direction));
+                
+                // Проверяем элементальный бонус для соседней карты
+                let elementalBonus = null;
+                if (this.rules.ELEMENTAL && this.boardElements[adjPos]) {
+                    elementalBonus = {
+                        element: this.boardElements[adjPos],
+                        bonus: adjCard.element === this.boardElements[adjPos] ? 1 : -1
+                    };
+                }
+                
+                // Сохраняем для правила SAME
+                if (attackValue === defendValue) {
+                    if (!sameValueCards.has(attackValue)) {
+                        sameValueCards.set(attackValue, []);
+                    }
+                    sameValueCards.get(attackValue).push({ pos: adjPos, card: adjCard });
+                    // Отмечаем карту как участвующую в правиле
+                    adjCard.specialRules = { same: true, plus: false, combo: false, wasUsedInRule: true };
+                }
+                
+                // Сохраняем для правила PLUS
+                if (this.rules.PLUS) {
+                    adjacentValues.push({ 
+                        sum: attackValue + defendValue,
+                        pos: adjPos,
+                        card: adjCard
+                    });
+                    // Отмечаем карту как участвующую в правиле
+                    adjCard.specialRules = { same: false, plus: true, combo: false, wasUsedInRule: true };
+                }
+
                 if (this._checkCapture(card, adjCard, direction)) {
                     capturedCards.push({ position: adjPos, card: adjCard });
                     captureDirections.push(direction);
                     adjCard.setOwner(player);
+                    
+                    // Добавляем информацию об элементальном бонусе для захваченной карты
+                    if (elementalBonus) {
+                        elementalBonuses.capturedCards.push({
+                            position: adjPos,
+                            ...elementalBonus
+                        });
+                    }
                 }
             }
+        }
+
+        // Проверяем правило SAME
+        if (this.rules.SAME && sameValueCards.size > 0) {
+            for (const [value, cards] of sameValueCards) {
+                if (cards.length >= 2) {
+                    specialRules.same = true;
+                    cards.forEach(({ pos, card }) => {
+                        if (!capturedCards.some(c => c.position === pos)) {
+                            capturedCards.push({ position: pos, card });
+                            card.setOwner(player);
+                            // Обновляем информацию о правиле
+                            card.specialRules = { same: true, plus: false, combo: false, wasUsedInRule: true };
+                        }
+                    });
+                }
+            }
+        }
+
+        // Проверяем правило PLUS
+        if (this.rules.PLUS && adjacentValues.length >= 2) {
+            const sums = new Map();
+            adjacentValues.forEach(({ sum, pos, card }) => {
+                if (!sums.has(sum)) sums.set(sum, []);
+                sums.get(sum).push({ pos, card });
+            });
+
+            for (const [sum, cards] of sums) {
+                if (cards.length >= 2) {
+                    specialRules.plus = true;
+                    cards.forEach(({ pos, card }) => {
+                        if (!capturedCards.some(c => c.position === pos)) {
+                            capturedCards.push({ position: pos, card });
+                            card.setOwner(player);
+                            // Обновляем информацию о правиле
+                            card.specialRules = { same: false, plus: true, combo: false, wasUsedInRule: true };
+                        }
+                    });
+                }
+            }
+        }
+
+        // Если сработало и SAME и PLUS, отмечаем комбо
+        if (specialRules.same && specialRules.plus) {
+            specialRules.combo = true;
+            // Обновляем информацию о комбо для всех захваченных карт
+            capturedCards.forEach(({ card }) => {
+                card.specialRules.combo = true;
+            });
         }
 
         // Обновляем общий счет на основе карт на поле
@@ -545,7 +689,9 @@ export class Game {
 
         return {
             capturedCards,
-            captureDirections
+            captureDirections,
+            specialRules,
+            elementalBonuses
         };
     }
 
