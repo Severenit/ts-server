@@ -36,6 +36,35 @@ export const cardsRoutes: Record<string, ServerRoute> = {
         }
     },
 
+    // Получение всех карт в игре
+    getAllCards: {
+        method: 'GET' as const,
+        path: '/api/cards/all',
+        handler: async (request: Request, h: ResponseToolkit) => {
+            // Проверяем версию клиента
+            const versionError = versionCheck(request, h);
+            if (versionError) return versionError;
+
+            try {
+                const deck = Card.createDeck();
+                
+                const response = {
+                    status: 'success',
+                    cards: deck.map(card => card.toClientObject(false))
+                };
+                
+                return response;
+            } catch (e) {
+                return errorHandler({
+                    h,
+                    details: 'Не удалось получить все карты',
+                    error: e,
+                    code: 500,
+                });
+            }
+        }
+    },
+
     // Получение карт пользователя
     getUserCards: {
         method: 'GET' as const,
