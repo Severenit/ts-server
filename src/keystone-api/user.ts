@@ -1,6 +1,6 @@
 // Получение или создание игрока
 import { client } from './index.js';
-import { ADD_CARD_TO_USER, CREATE_USER, DELETE_PLAYER_CARD, GET_PLAYER_CARD, GET_USER } from '../graphql/user.js';
+import { ADD_CARD_TO_USER, CREATE_USER, DELETE_PLAYER_CARD, GET_PLAYER_CARD, GET_USER, GET_ALL_USERS } from '../graphql/user.js';
 import bot from '../bot.js';
 import { Card } from '../game/core/card.js';
 import { User } from '../types/user.js';
@@ -194,5 +194,15 @@ export async function deletePlayerCard(userId: string, cardId: string) {
   } catch (error) {
     console.error('❌ Error deleting player card:', error);
     throw error;
+  }
+}
+
+export async function getAllUsers() {
+  try {
+    const data = await client.request<{ users: { telegram_id: string }[] }>(GET_ALL_USERS);
+    return data.users.map(user => user.telegram_id);
+  } catch (error) {
+    console.error('❌: Error getting all users:', error);
+    return [];
   }
 }

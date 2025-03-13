@@ -5,6 +5,8 @@ import { Update } from "node-telegram-bot-api";
 import { authRoutes } from './routes/auth.js';
 import { cardsRoutes } from './routes/cards.js';
 import { gameRoutes } from './routes/game.js';
+import { broadcastRoutes } from './routes/broadcast.js';
+import { ensureWebhook } from './utils/webhook.js';
 
 interface WebhookInfo {
   ok: boolean;
@@ -80,6 +82,7 @@ export const createServer = async () => {
     ...Object.values(authRoutes),
     ...Object.values(cardsRoutes),
     ...Object.values(gameRoutes),
+    ...Object.values(broadcastRoutes),
   ];
 
   server.route(routes);

@@ -144,3 +144,11 @@ export const DELETE_PLAYER_CARD = gql`
         }
     }
 `;
+
+export const GET_ALL_USERS = `
+  query GetAllUsers {
+    users {
+      telegram_id
+    }
+  }
+`;
