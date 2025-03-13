@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "nodemon --watch 'src/**/*.ts' --exec 'NODE_OPTIONS=\"--loader ts-node/esm\" ts-node' src/server.ts",
+    "dev": "nodemon --watch src -e ts,js --exec node --loader ts-node/esm/transpile-only src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
     "vercel-dev": "vercel dev",
@@ -14,6 +14,8 @@
   },
   "devDependencies": {
     "@hapi/hapi": "^21.3.3",
+    "@swc/core": "^1.11.9",
+    "@swc/helpers": "^0.5.15",
     "@types/node": "^20.0.0",
     "@types/node-telegram-bot-api": "^0.64.0",
     "@vercel/node": "^3.0.0",

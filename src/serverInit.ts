@@ -6,7 +6,7 @@ import { authRoutes } from './routes/auth.js';
 import { cardsRoutes } from './routes/cards.js';
 import { gameRoutes } from './routes/game.js';
 import { broadcastRoutes } from './routes/broadcast.js';
-import { ensureWebhook } from './utils/webhook.js';
+
 
 interface WebhookInfo {
   ok: boolean;
