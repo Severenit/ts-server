@@ -206,3 +206,33 @@ export async function getAllUsers() {
     return [];
   }
 }
+
+// Восстановление карт пользователя
+export async function restoreUserCards(userId: string) {
+  try {
+    console.log('🎮 Восстанавливаем карты для пользователя:', userId);
+    
+    // Получаем 6 случайных карт из первых трех уровней
+    const starterCards = Card.getStarterCards().slice(0, 6);
+    
+    const addCardPromises = starterCards.map(card =>
+      addCardToPlayer(userId, card.id)
+        .then(addedCard => {
+          console.log(`🎮 Успешно добавлена карта ${card.id}`);
+          return addedCard;
+        })
+        .catch(error => {
+          console.error(`❌ Ошибка при добавлении карты ${card.id}:`, error);
+          throw error;
+        })
+    );
+
+    const addedCards = await Promise.all(addCardPromises);
+    console.log('🎮 Успешно добавлены все карты:', addedCards);
+
+    return addedCards;
+  } catch (error) {
+    console.error('❌ Ошибка при восстановлении карт:', error);
+    throw error;
+  }
+}

@@ -1,5 +1,5 @@
 import { Card } from '../game/core/card.js';
-import { getPlayerCards } from '../keystone-api/cards.js';
+import { getPlayerCards, restoreUserCards } from '../keystone-api/cards.js';
 import { Request, ResponseToolkit, ServerRoute } from '@hapi/hapi';
 import { errorHandler } from '../utils/error.js';
 import { versionCheck } from '../utils/versionCheck.js';
@@ -88,6 +88,49 @@ export const cardsRoutes: Record<string, ServerRoute> = {
                 return errorHandler({
                     h,
                     details: 'Failed to get starter cards',
+                    error: e,
+                    code: 400,
+                });
+            }
+        }
+    },
+
+    // Восстановление карт пользователя
+    restoreCards: {
+        method: 'POST' as const,
+        path: '/api/player/{telegramId}/restore-cards',
+        handler: async (request: Request, h: ResponseToolkit) => {
+            // Проверяем версию клиента
+            const versionError = versionCheck(request, h);
+            if (versionError) return versionError;
+      
+            try {
+                const { telegramId } = request.params;
+                
+                // Получаем текущие карты пользователя
+                const currentCards = await getPlayerCards(telegramId);
+                
+                // Если у пользователя больше 20 карт, не даем восстановить
+                if (currentCards.length >= 20) {
+                    return h.response({
+                        status: 'error',
+                        message: 'У вас уже достаточно карт (20 или больше)'
+                    }).code(400);
+                }
+                
+                // Восстанавливаем карты
+                const restoredCards = await restoreUserCards(telegramId);
+                
+                return {
+                    status: 'success',
+                    message: 'Карты успешно восстановлены',
+                    cards: restoredCards
+                };
+            } catch (e) {
+                console.error('Error restoring cards:', e);
+                return errorHandler({
+                    h,
+                    details: 'Не удалось восстановить карты',
                     error: e,
                     code: 400,
                 });

@@ -1,7 +1,9 @@
 import { Card } from '../game/core/card.js';
 import { client } from './index.js';
 import { GET_USER_CARDS } from '../graphql/user.js';
+import { restoreUserCards } from './user.js';
 
+export { restoreUserCards };
 
 export async function getPlayerCards(telegramId: string) {
   try {
