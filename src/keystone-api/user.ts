@@ -208,31 +208,50 @@ export async function getAllUsers() {
 }
 
 // Восстановление карт пользователя
-export async function restoreUserCards(userId: string) {
+export async function restoreUserCards(telegramId: string) {
   try {
-    console.log('🎮 Восстанавливаем карты для пользователя:', userId);
+    console.log('🎮 Восстанавливаем карты для пользователя:', telegramId);
+    
+    // Сначала получаем userId по telegramId
+    const userData = await client.request<UserResponse>(GET_USER, {
+      telegram_id: telegramId
+    });
+
+    if (!userData.user) {
+      throw new Error(`Пользователь с telegram_id ${telegramId} не найден`);
+    }
+
+    const userId = userData.user.id;
+    console.log('🎮 Получен userId:', userId);
     
     // Получаем 6 случайных карт из первых трех уровней
     const starterCards = Card.getStarterCards().slice(0, 6);
+    console.log('🎮 Выбраны карты для восстановления:', starterCards.map(card => card.name));
     
     const addCardPromises = starterCards.map(card =>
       addCardToPlayer(userId, card.id)
         .then(addedCard => {
-          console.log(`🎮 Успешно добавлена карта ${card.id}`);
+          console.log(`✅ Успешно добавлена карта ${card.name} (${card.id})`);
           return addedCard;
         })
         .catch(error => {
-          console.error(`❌ Ошибка при добавлении карты ${card.id}:`, error);
+          console.error(`❌ Ошибка при добавлении карты ${card.name} (${card.id}):`, error);
           throw error;
         })
     );
 
+    console.log('🎮 Ожидаем добавления всех карт...');
     const addedCards = await Promise.all(addCardPromises);
-    console.log('🎮 Успешно добавлены все карты:', addedCards);
+    console.log('✅ Все карты успешно добавлены:', addedCards.length, 'штук');
 
     return addedCards;
   } catch (error) {
     console.error('❌ Ошибка при восстановлении карт:', error);
+    console.error('❌ Детали ошибки:', {
+      name: error.name,
+      message: error.message,
+      stack: error.stack
+    });
     throw error;
   }
 }

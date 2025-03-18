@@ -106,12 +106,15 @@ export const cardsRoutes: Record<string, ServerRoute> = {
       
             try {
                 const { telegramId } = request.params;
+                console.log('🎮 Начинаем восстановление карт для пользователя:', telegramId);
                 
                 // Получаем текущие карты пользователя
                 const currentCards = await getPlayerCards(telegramId);
+                console.log('🎮 Текущие карты пользователя:', currentCards.length, 'штук');
                 
                 // Если у пользователя больше 20 карт, не даем восстановить
                 if (currentCards.length >= 20) {
+                    console.log('❌ У пользователя слишком много карт:', currentCards.length);
                     return h.response({
                         status: 'error',
                         message: 'У вас уже достаточно карт (20 или больше)'
@@ -119,19 +122,27 @@ export const cardsRoutes: Record<string, ServerRoute> = {
                 }
                 
                 // Восстанавливаем карты
+                console.log('🎮 Начинаем процесс восстановления карт');
                 const restoredCards = await restoreUserCards(telegramId);
+                console.log('✅ Карты успешно восстановлены:', restoredCards.length, 'штук');
                 
                 return {
                     status: 'success',
                     message: 'Карты успешно восстановлены',
                     cards: restoredCards
                 };
-            } catch (e) {
-                console.error('Error restoring cards:', e);
+            } catch (e: unknown) {
+                const error = e as Error;
+                console.error('❌ Ошибка при восстановлении карт:', error);
+                console.error('❌ Детали ошибки:', {
+                    name: error.name,
+                    message: error.message,
+                    stack: error.stack
+                });
                 return errorHandler({
                     h,
                     details: 'Не удалось восстановить карты',
-                    error: e,
+                    error,
                     code: 400,
                 });
             }

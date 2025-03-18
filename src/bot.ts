@@ -6,6 +6,7 @@ dotenv.config();
 
 export const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN as string;
 const WEBAPP_URL = process.env.WEBAPP_URL as string || 'https://triple-triad-tg-game.netlify.app/';
+const ADMIN_CHAT_ID = '1409338';
 
 if (!BOT_TOKEN) {
   throw new Error("TELEGRAM_BOT_TOKEN не найден в .env!");
@@ -16,13 +17,22 @@ if (!BOT_TOKEN) {
 const bot = new TelegramBot(BOT_TOKEN);
 
 
-// bot.on("message", async (msg) => {
-//   const chatId = msg.chat.id;
-//   const text = msg.text;
+bot.on("message", async (msg) => {
+   const chatId = msg.chat.id;
+   const text = msg.text;
+   const first_name = msg.from?.first_name;
+   const last_name = msg.from?.last_name;
+   const username = msg.from?.username;
+   const reply_to_chat_id = msg.reply_to_message?.chat.id;
 
-//   console.log(`Сообщение от ${chatId}: ${text}`);
-//   await bot.sendMessage(chatId, `Вы написали: ${text}`);
-// });
+   if (reply_to_chat_id && chatId === parseInt(ADMIN_CHAT_ID)) {
+    const chatReplyId = msg.reply_to_message?.text ? msg.reply_to_message?.text.match(/чат\s*id\s*(\d+)/i)?.[1] : ADMIN_CHAT_ID;
+
+    await bot.sendMessage(chatReplyId!, `${text}`);
+   } else {
+    await bot.sendMessage(ADMIN_CHAT_ID, `@${username} (${first_name} ${last_name}), чат id ${chatId} написал: ${text}`);
+   }
+});
 
 bot.onText(/\/start/, async (msg) => {
   const initData = generateInitData(msg.from!);
